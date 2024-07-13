@@ -1,8 +1,8 @@
 CROSS=aarch64-linux-gnu-
 CC=$(CROSS)gcc
-CFLAGS=-Wall -O -g
+CFLAGS=-Wall -O -ffreestanding
 
-KERNEL_OBJS=kernel.o
+KERNEL_OBJS=kernel.o start.o
 
 all: kernel8.img
 
