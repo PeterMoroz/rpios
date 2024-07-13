@@ -1,16 +1,21 @@
 CROSS=aarch64-linux-gnu-
 CC=$(CROSS)gcc
-CFLAGS=-Wall -O -ffreestanding
 
-KERNEL_OBJS=kernel.o start.o
+SRCS = $(wildcard *.c)
+OBJS = $(SRCS:.c=.o)
+CFLAGS=-Wall -O -ffreestanding -nostdinc -nostdlib -nostartfiles
+
 
 all: kernel8.img
+
+start.o: start.S
+	$(CROSS)gcc $(CFLAGS) -c start.S -o start.o
 
 kernel8.img: kernel8.elf
 	$(CROSS)objcopy -O binary $< $@
 
-kernel8.elf: $(KERNEL_OBJS) kernel.ld
-	$(CROSS)ld -o $@ $(KERNEL_OBJS) -Tkernel.ld
+kernel8.elf: start.o $(OBJS) kernel.ld
+	$(CROSS)ld -nostdlib -nostartfiles start.o  $(OBJS) -T kernel.ld -o $@
 
 clean:
-	rm -f $(KERNEL_OBJS) *.img *.elf
+	rm -f *.o *.img *.elf
