@@ -126,19 +126,19 @@ sudo mount /dev/sdd1 /mnt/usbdrive
 The code above is the simplest skeleton  but it does nothing except for waiting for events in busy loop. We have no opportunities to check that it works well on the real RPI board. Instead of an empty loop lets write someting that is observable in the real world. the simplest example is to turn on the LED via GPIO. 
 
 ###### GPIO
-General Purpose Input Output (GPIO) pins are used in hardware to interact with the external world. GPIO serve various purpose: connecting to basic peripherals like button, LED, switches, sensors, etc.
-GPIO pins should be configured either as Input or Output (direction) before using them. GPIO pins can be selectively enabled and disabled based on the need.
-** GPIO Port** is a group of pins (8) controlled in a group.
-GPIO pins are controlled by four registers:
-* IOPIN - register to read status of pins.
-* IODIR - register to setup direction of pins.
-* IOSET - register to set GPIO pins.
-* IOCLR - register to clear GPIO pins.
-To set particular pin respective bit should be set as 1 in IOSET register and to clear the pin respective bit is set as set as 1 in IOCLR register.
+GPIO stands for General Purpose Input/Output. As the name implies, GPIO is a general mechanism for transmitting data/signals into and out of some device through electrical pins, known as GPIO pins.
 
+A GPIO pin can act as either output or input. When a GPIO pin is acting as an output, it can either be set ON or OFF. When ON the Raspberry Pi drives the pin at 3.3v. When the GPIO pin is OFF, no current flows through the pin. When a GPIO pin is acting as an input Rasbperry Pi reports whether the pin is being driven at 3.3v or not.
 
+Use GPIO21 (PIN40) and GND (PIN39) to connect the LED. Note that pin-40 on the Raspberry Pi should go to the *longer leg* of your LED. The shorter leg is connected to pin-39 (ground) on the Raspberry Pi.
 
-#### References
-* https://jensd.be/1126/linux/cross-compiling-for-arm-or-aarch64-on-debian-or-ubuntu
-* https://williamdurand.fr/2021/01/23/bare-metal-raspberry-pi-2-programming/
+###### GPIO Memory-Mapped Interface
+The vast majority of modern hardware devices communicate with software through *memory-mapped I/O*. The concept is simple: devices expose their functionality through set of registers and provide a specification about what will happen if certain register are read or written to. These registers are memory-mapped. That is, the register has an address in the memory space and can be reffered through its address.
+
+Each GPIO is controlled by three registers (Function Select, Set, Clear). As we are using the GPIO21 to control the LED we need to use these three registers:
+| name    | peripheral address | description            | size   | read/write |
+| :---    |        :----:      |   :----:               | :----: | ---:       |
+| GPFSEL2 |  0x3F200008        | GPIO function select 2 | 32 bit |  R/W       |
+| GPSET0  |  0x3F20001C        | GPIO pin turn ON       | 32 bit |    W       |
+| GPCLR0  |  0x3F200028        | GPIO pin turn OFF      | 32 bit |    W       |
 
