@@ -22,7 +22,7 @@ void uart_init()
 	*AUX_MU_LCR = 3;
 	*AUX_MU_MCR = 0;
 	*AUX_MU_IER = 0;
-	*AUX_MU_IIR = 0;
+	*AUX_MU_IIR = 6;
 	*AUX_MU_BAUD = 270;
 	r = *GPFSEL1;
 	r &= ~((7 << 12) | (7 << 15));
