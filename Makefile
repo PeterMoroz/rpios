@@ -17,5 +17,8 @@ kernel8.img: kernel8.elf
 kernel8.elf: start.o $(OBJS) kernel.ld
 	$(CROSS)ld -nostdlib -nostartfiles start.o  $(OBJS) -T kernel.ld -o $@
 
+runqemu: kernel8.img
+	qemu-system-aarch64 -M raspi3 -kernel kernel8.img -serial null -serial stdio
+
 clean:
 	rm -f *.o *.img *.elf
