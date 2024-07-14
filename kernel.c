@@ -1,6 +1,22 @@
 #include "uart.h"
 #include "mbox.h"
 
+#define PM_PASSWORD 0x5a000000
+#define PM_RSTC ((volatile unsigned int *)0x3F10001c)
+#define PM_WDOG ((volatile unsigned int *)0x3F100024)
+
+void schedule_reset(int tick) 
+{
+	*PM_RSTC = PM_PASSWORD | 0x20;
+	*PM_WDOG = PM_PASSWORD | tick;
+}
+
+void cancel_reset() 
+{
+	*PM_RSTC = PM_PASSWORD;
+	*PM_WDOG = PM_PASSWORD;
+}
+
 int strcmp(const char *s1, const char *s2)
 {
 	int r = -1;
@@ -29,6 +45,7 @@ void kmain(void)
 	char c;
 	char cmd[8] = { '\0' };
 	int i = 0;
+	int rst = 0;
 
 	uart_init();
 
@@ -93,7 +110,16 @@ void kmain(void)
 		} else if (strcmp(cmd, "hello") == 0) {
 			uart_puts("Hello World!\n");
 		} else if (strcmp(cmd, "reboot") == 0) {
-			uart_puts("reboot not implemented yet\n");
+			if (rst) {
+				cancel_reset();
+				rst = 0;
+				uart_puts("reset canceled\n");
+			} else {
+				uart_puts("schedule reset\n");
+				schedule_reset(1000000);
+				rst = 1;
+			}
+
 		} else {
 			uart_puts("unknown command\n");
 		}
