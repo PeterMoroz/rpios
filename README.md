@@ -3,7 +3,7 @@ Experimentation with bare-metal RPI and learning of writing the OS kernel.
 Based on the https://oscapstone.github.io/labs/overview.html 
 
 ## Lab 0
-The main goal of this lab are:
+The goals of this lab are:
 * setup build (and debug) environment
 * make a minimal kernel skeleton and run it on emulator (QEMU)
 * prepare SD card to boot RPI
@@ -142,3 +142,163 @@ Each GPIO is controlled by three registers (Function Select, Set, Clear). As we 
 | GPSET0  |  0x3F20001C        | GPIO pin turn ON       | 32 bit |    W       |
 | GPCLR0  |  0x3F200028        | GPIO pin turn OFF      | 32 bit |    W       |
 
+
+## Lab 1
+The goals of this lab are:
+* Practice with programming of GPIO
+* Understand some periperals of RPI
+* Setup mini UART
+* Setup mailbox
+
+
+#### start.S - the kernel entry point
+
+```
+_start:
+  mrs x1, mpidr_el1
+  and x1, x1, #3
+  cbz x1, 2f
+1:
+  wfe
+  b 1b
+```
+These are the first instuctions of our kernel. They will send three out of the four cores to infninite loop. One core is enough for our simple kernel.
+
+```
+  ldr x1, =_start
+  mov sp, x1
+```
+This says that our C stack should start at address where the kernel is loaded. Since the stack grow downwards it doesn't damage the kernel.
+
+```
+  ldr x1, =__bss_start
+  ldr w2, =__bss_size
+```
+This loads the addresses of the start of the BSS section and its size into registers. BSS is where C global variables that are not initialized at compile time are stored. The symbols `__bss_start` and `__bss_size` are defined in the linker script.
+
+```
+3:
+  cbz w2, 4f
+  str xzr, [x1], #8
+  sub w2, w2, #1
+  cbnz w2, 3b
+```
+This code is what zeroes out the BSS section. It put the content of the special register xzr (zero register) into the address in x1. Then it decrements the value of the register w2 (which contains the size of BSS section in 8-byte words). This loops until w2 is not zero.
+
+```
+  bl kmain
+  b 1b
+
+```
+This call the function `kmain`. When the function returns it jumps to the label where infinite loop.
+
+#### some notes about linking
+* In a linker script, **.** means *current address*, You can assign the current address and also assign things to the current address,
+* The sections of a C program
+    - **.text** is where executable code goes
+    - **.rodata** is *read only data*; it is where global constants are placed
+    - **.data** is where global variables that are initialized at compile time are placed
+    - **.bss** is where uninitialized global variables are placed
+
+#### Mini UART
+The Raspberry Pi boards feature is an almost 16650-compatible UART called the Mini UART.
+
+
+###### initialization
+```
+       *AUX_ENABLE |= 1;    // Enable MiniUART
+       *AUX_MU_CNTL = 0;    // Disable receiver and transmitter while configuring
+       *AUX_MU_LCR = 3;     // Set 8-bit mode
+       *AUX_MU_MCR = 0;     // Set RTS line high
+       *AUX_MU_IER = 0;     // Disable interrupts, we'll use polling mode
+       *AUX_MU_IIR = 6;     // Clear receive FIFO and transmit FIFO
+       *AUX_MU_BAUD = 270;  // Set the baud rate 115200
+```
+
+Set alternate function 5 for GPIO14 and GPIO15
+```
+       r = *GPFSEL1;
+       r &= ~((7 << 12) | (7 << 15));
+       r |= (2 << 12) | (2 << 15);
+       *GPFSEL1 = r;
+```
+
+Disable pull-up/pull-down control for GPIO14 and GPIO15
+```
+       *GPPUD = 0;
+       r = 150;
+       while (r--) { asm volatile("nop"); }
+       *GPPUDCLK0 = (1 << 14) | (1 << 15);
+       r = 150;
+       while (r--) { asm volatile("nop"); }
+       *GPPUDCLK0 = 0;
+```
+
+When setup is complete, enable receiver and transmitter
+```
+       *AUX_MU_CNTL = 3;
+```
+
+###### send
+Wait untill transmitter FIFO is able to accept at least one character and then write character to data register.
+```
+  do { asm volatile("nop"); } while (!(*AUX_MU_LSR & 0x20));
+```
+
+###### receive
+Wait untill receiver FIFO holds at leas one symbol and then read it from the data register.
+```
+       do { asm volatile("nop"); } while(!(*AUX_MU_LSR & 0x01));
+       r = (char)(*AUX_MU_IO);
+```
+
+#### Mailbox
+The mailbox is peripheral which allow bidirectional communication between CPU and GPU. To talk to the GPU, the CPU has to send a mail to the mailbox. Upon receiving the reques, the GPU places the response in another mailbox which the CPU can read to get the requested data.
+The mailboxes act as *pipes* between the CPU and the GPU. The peripheral exposes two mailboxes, 0 and 1, to allow full-duplex communication. Each mailbox operates as a FIFO buffer with the capacity to store up to eight 32-bit words. The mailbox 0 alone supports triggering interrupts on the CPU side, which makes it well-suited for CPU-initiated read operations.
+
+###### registers
+Each mailbox exposes 5 registers. Their addresses start at offset 0xB880.
+| Offset (mb 0/mb 1) |   Purpose  | Description                               |
+|--------------------|------------|-------------------------------------------|
+|  0x00/0x20         | Read/Write | Access to FIFO                            |
+|  0x10/0x30         | Peek       | Read without popping FIFO                 |
+|  0x14/0x34         | Sender     | Bits [1:0] specify the sender ID          |
+|  0x18/0x38         | Status     | Contains information about the FIFO state |
+|  0x1C/0x3C         | Config     | Used for configuring mailbox behaviour    |
+
+###### channels
+A channel acts as a descriptor for the asoociated data within a mail. It helps the GPU discern how to process the incoming mail.
+| Channel | Name                       |
+|---------|----------------------------|
+| 0       | Power management           |
+| 1       | Framebuffer                |
+| 2       | Virtual UART               |
+| 3       | VCHIQ                      |
+| 4       | LEDs                       |
+| 5       | Buttons                    |
+| 6       | Touch screen               |
+| 8       | Property tags (ARM to GPU) |
+| 9       | Property tags (GPU to ARM) |
+
+
+###### talking to the GPU
+The mailbox peripheral is poorly documented. For the purpose of this lab we'll use only one interface - the prorperty interface. This is almost only one interface which is documented.
+To query the properties from GPU
+1. compose a message.
+The message consists of a size, a status field (request, successfull response or failure notification), a list of tags. The list of tags is zero teminated, i.e. the last tag should be zero.
+Each of the tag is an individual request which consists of identifier, a size of its value buffer, a place to put the result's size and result buffer itself.
+2. compose a mail.
+The mail is a fundamental quantum for the information exchange over the mailboxes. A mail encapsulates the data and channel number within a 32-bit word. The channel number to read properties is 8, the data is pointer to the message. Because of we have only 28 bits for data field, the pointer must be 16 bytes aligned.3. put mail into the mailbox
+ * in a loop check the status register to see if the FIFO has at least one available spot
+ * write mail into the write register
+4. get the mail from the mailbox
+Thought the mailbox supports interrupts, we will implement the busy-wait fetching to simplification.
+ * in a loop read the status register to make sure that FIFO has at least one item 
+ * read the mail from the read register
+ * compare the mail received with that one which was send before, ignore response it if not our
+ * check that status field indicates the successfull response
+5. read the values depending on what kind of information was requested
+
+
+#### references
+[RPi mailbox](https://bitbanged.com/posts/understanding-rpi/the-mailbox/)

@@ -40,6 +40,68 @@ int strcmp(const char *s1, const char *s2)
 	return r;
 }
 
+void print_board_sn()
+{
+	volatile unsigned __attribute__((aligned(16))) mbox[8];
+	mbox[0] = 8 * 4;
+	mbox[1] = MBOX_REQUEST;
+	mbox[2] = MBOX_TAG_GETSERIAL;
+	mbox[3] = 8;
+	mbox[4] = 0;
+	mbox[5] = 0;
+	mbox[6] = 0;
+	mbox[7] = MBOX_TAG_LAST;
+
+	unsigned data = (unsigned long)&mbox[0] >> 4;
+	unsigned mail = mbox_compose(MBOX_CH_PROP, data);
+	mbox_put(mail);
+	while (1) {
+		if (mail == mbox_get())
+			break;
+	}
+
+	if (mbox[1] != MBOX_RESPONSE_SUCCESS) {
+		uart_puts("can't read board S/N\n");
+	} else {
+		uart_puts("The board S/N: ");
+		uart_hex(mbox[6]);
+		uart_hex(mbox[5]);
+		uart_send('\r');
+		uart_send('\n');
+	}
+}
+
+void print_board_revision()
+{
+	volatile unsigned __attribute__((aligned(16))) mbox[7];
+	mbox[0] = 7 * 4;
+	mbox[1] = MBOX_REQUEST;
+	mbox[2] = MBOX_TAG_GETREVISION;
+	mbox[3] = 4;
+	mbox[4] = 0;
+	mbox[5] = 0;
+	mbox[6] = MBOX_TAG_LAST;
+
+	unsigned data = (unsigned long)&mbox[0] >> 4;
+	unsigned mail = mbox_compose(MBOX_CH_PROP, data);
+	mbox_put(mail);
+	while (1) {
+		if (mail == mbox_get())
+			break;
+	}
+
+	if (mbox[1] != MBOX_RESPONSE_SUCCESS) {
+		uart_puts("can't read board revision\n");
+	} else {
+		uart_puts("The board revision: ");
+		uart_hex(mbox[5]);
+		uart_send('\r');
+		uart_send('\n');
+	}
+}
+
+
+
 void kmain(void)
 {
 	char c;
@@ -49,43 +111,8 @@ void kmain(void)
 
 	uart_init();
 
-
-	mbox[0] = 9 * 4;
-	mbox[1] = MBOX_REQUEST;
-	mbox[2] = MBOX_TAG_GETSERIAL;
-	mbox[3] = 8;
-	mbox[4] = 8;
-	mbox[5] = 0;
-	mbox[6] = 0;
-	mbox[7] = MBOX_TAG_LAST;
-
-	if (mbox_call(MBOX_CH_PROP)) {
-		uart_puts("My serial number is: ");
-		uart_hex(mbox[6]);
-		uart_hex(mbox[5]);
-		uart_send('\r');
-		uart_send('\n');
-	} else {
-		uart_puts("unable to query serial number!\n");
-	}
-
-	mbox[0] = 7 * 4;
-	mbox[1] = MBOX_REQUEST;
-	mbox[2] = MBOX_TAG_GETREVISION;
-	mbox[3] = 4;
-	mbox[4] = 0;
-	mbox[5] = 0;
-	mbox[6] = MBOX_TAG_LAST;
-
-	if (mbox_call(MBOX_CH_PROP)) {
-		uart_puts("The board revision is: ");
-		uart_hex(mbox[5]);
-		uart_send('\r');
-		uart_send('\n');
-	} else {
-		uart_puts("unable to query board revision!\n");
-	}
-
+	print_board_sn();
+	print_board_revision();
 
 	while (1) {
 		uart_send('>');
