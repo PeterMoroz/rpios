@@ -302,3 +302,27 @@ Thought the mailbox supports interrupts, we will implement the busy-wait fetchin
 
 #### references
 [RPi mailbox](https://bitbanged.com/posts/understanding-rpi/the-mailbox/)
+
+## Lab 2
+The goals of this lab are:
+* Implement a bootloader that loads kernel image through UART
+* Add an initial ramdisk
+* Implement a simple memory allocator
+* Add support of device tree
+
+###### load the kernel image through UART
+Initially the kernel image is written on SD-card into boot partition. When kernel starts it is loaded into memory and starts execution from predefined address. Then it make attempt to load a new kernel image via UART (the UART must be initialized at that moment). The kernel image is transferred via the simplified implementation of XModem communication protocol:
+* send a special command to opposite device which initiates the transfer session.
+* the opposite device responds either with XModem packet or special command (not specified by XModem protocol, just my workaround) which tells to RPi to cancel session and continue with current kernel.
+* RPi receive packet, check that its sequence number and calculate checksum of data block.
+* if packet number match to the expected one and the checksum is correct, RPi send acknowledge command to the kernel sender otherwise the negative acknowledge will be send. 
+* when packet is acknowledged the kernel sender send the next packet, otherwise resend the previous one.
+* the session is finished after transferring the whole image.
+
+During the transferring session RPi writes the new kernel image to the address in memory which differs from that one at which the currently running kernel started. When the image transferring is finished RPi jumps to a location where new image written and start execution of just received kernel.
+
+
+##### references
+[Linux Serial Ports Using C/C++](https://blog.mbedded.ninja/programming/operating-systems/linux/linux-serial-ports-using-c-cpp/
+[Booting your own kernel on RPi via UART](https://blog.nicolasmesa.co/posts/2019/08/booting-your-own-kernel-on-raspberry-pi-via-uart/)
+[XModem protocol with CRC](http://ee6115.mit.edu/amulet/xmodem.htm)

@@ -1,5 +1,6 @@
 #include "uart.h"
 #include "mbox.h"
+#include "utils.h"
 
 #define PM_PASSWORD 0x5a000000
 #define PM_RSTC ((volatile unsigned int *)0x3F10001c)
@@ -39,6 +40,120 @@ int strcmp(const char *s1, const char *s2)
 	}
 	return r;
 }
+
+void readline(char *buf, int maxlen) {
+       int n = 0;
+       while (n < maxlen - 1) {
+	       char c = uart_getc();
+	       if (c == '\n' || c == '\r' || c == '\0')
+		       break;
+	       buf[n++] = c;
+       }
+       buf[n] = '\0';
+}
+
+unsigned char crc8(const char *data, int size) {
+	unsigned char crc = 0;
+	for (int i = 0; i < size; i++)
+		crc += data[i];
+	return crc;
+}
+
+int crc16(const char *data, int size) {
+	int crc = 0;
+	unsigned char i = 0;
+
+	while (--size >= 0) {
+		crc = crc ^ (int)*data++ << 8;
+		i = 8;
+		do {
+			if (crc & 0x8000)
+				crc = crc << 1 ^ 0x1021;
+			else
+				crc = crc << 1;
+		} while (--i);
+	}
+	return crc;
+}
+
+void load_kernel() {
+	char c;
+	while (1) {
+		uart_send(0x43);
+		c = uart_getc();
+		if (c == 0x00)
+			return;
+		if (c == 0x01)
+			break;
+	}
+
+	// not a packet header, just return
+	if (c != 0x01)
+		return;
+
+	unsigned short packet_num = 1;
+	char data_buffer[128];
+	char *kernel = (char *)0x00;
+	// receiving kernel image
+	while (1) {
+		switch (c) {
+			case 0x01: { // SOH - Start Of Header
+				char n1 = uart_getc();
+				char n2 = uart_getc();
+				for (int i = 0; i < 128; i++) {
+					data_buffer[i] = uart_getc();
+				}
+				char c1 = uart_getc();
+				char c2 = uart_getc();
+
+				if ((unsigned short)n1 + (unsigned short)n2 != 0xFF) {
+					uart_send(0x15);
+				} else if ((unsigned short)n1 != packet_num) {
+					uart_send(0x15);
+				} else {
+					// TO DO: fix CRC check failed.
+					/*
+					int crc = c1;
+					crc = crc << 8;
+					crc |= c2 & 0xFF;
+					if (crc != crc16(data_buffer, 128)) {
+						uart_send(0x15);
+					} else {
+						// TO DO: write piece of kernel
+						packet_num++;
+						uart_send(0x06);
+					}
+					*/
+					unsigned char crc = crc8(data_buffer, 128);
+					if (crc != (unsigned char)c1 || crc != (unsigned char)c2) {
+						uart_send(0x15);
+					} else {
+						for (int i = 0; i < 128; i++) {
+							*kernel++ = data_buffer[i];
+						}
+						packet_num++;
+						uart_send(0x06);
+					}
+				}
+			}
+			break;
+			case 0x04: { // EOT - End Of Transmission
+				uart_send(0x06);
+			}
+			break;
+			case 0x17: { // ETB - End of Transmission Block
+				uart_send(0x06);
+				branch_to_address((void *)0x00);
+				// return;
+			}
+			break;
+		default:
+			return;
+		}
+		c = uart_getc();
+	}
+}
+
 
 void print_board_sn()
 {
@@ -100,16 +215,13 @@ void print_board_revision()
 	}
 }
 
-
-
 void kmain(void)
 {
-	char c;
-	char cmd[8] = { '\0' };
-	int i = 0;
 	int rst = 0;
+	char cmd[8];
 
 	uart_init();
+	load_kernel();
 
 	print_board_sn();
 	print_board_revision();
@@ -117,19 +229,12 @@ void kmain(void)
 	while (1) {
 		uart_send('>');
 		uart_send(' ');
-		i = 0;
-		while (i < 7) {
-			c = uart_getc();
-			if (c == '\r' || c == '\n')
-				break;
-			cmd[i++] = c;
-			uart_send(c);
-		}
-
-		cmd[i] = '\0';
+		
+		readline(cmd, 8);
+		uart_puts(cmd);
 		uart_send('\r');
 		uart_send('\n');
-
+		
 		if (strcmp(cmd, "help") == 0) {
 			uart_puts("help   : print this help menu\n");
 			uart_puts("hello  : print Hello World!\n");
