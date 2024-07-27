@@ -75,7 +75,7 @@ void cpio_read_catalog(putchar_cb_t putchar_cb)
 	}
 }
 
-int cpio_read_file(const char *fname, putchar_cb_t putchar_cb)
+int cpio_file_size(const char *fname)
 {
 	// const char *p = (char *)CPIO_ADDR;
 	const char *p = (char *)&_binary_ramdisk_start;
@@ -83,8 +83,6 @@ int cpio_read_file(const char *fname, putchar_cb_t putchar_cb)
 	struct cpio_newc_header hdr;
 	
 	char buffer[16];
-	int fsize = 0;
-	const char *pfile = 0L;
 	char found = 0;
 	while (1) {
 		memcpy(&hdr, p, sizeof(hdr));
@@ -107,6 +105,48 @@ int cpio_read_file(const char *fname, putchar_cb_t putchar_cb)
 		p += sz;
 		sz = hex_to_int(hdr.c_filesize, 8);
 		if (found == 1) {
+			return sz;
+		}
+		while ((sz & 0x3) != 0) {
+			sz++;
+		}
+		p += sz;
+	}
+	return -1;
+}
+
+int cpio_read_file(const char *fname, char *rd_buffer, int rd_buffer_size)
+{
+	// const char *p = (char *)CPIO_ADDR;
+	const char *p = (char *)&_binary_ramdisk_start;
+
+	struct cpio_newc_header hdr;
+	
+	char buffer[16];
+	int fsize = 0;
+	const char *pfile = 0L;
+	char found = 0;
+	while (1) {
+		memcpy(&hdr, p, sizeof(hdr));
+		int sz = hex_to_int(hdr.c_namesize, 8);
+		p += sizeof(hdr);
+		memset(buffer, 0, sizeof(buffer));
+		memcpy(buffer, p, sz);
+
+		if (strncmp(buffer, "TRAILER!!!", sz - 1) == 0) {
+			break;
+		}
+
+		if (strlen(fname) == (sz - 1) && strncmp(buffer, fname, sz - 1) == 0) {
+			found = 1;
+		}
+		
+		while (((sz + sizeof(hdr)) & 0x3) != 0) {
+			sz++;
+		}
+		p += sz;
+		sz = hex_to_int(hdr.c_filesize, 8);
+		if (found == 1) {
 			fsize = sz;
 			pfile = p;
 			break;
@@ -118,14 +158,12 @@ int cpio_read_file(const char *fname, putchar_cb_t putchar_cb)
 	}
 
 	if (found == 1) {
-		for (int i = 0; i < fsize; i++) {
-			putchar_cb(*pfile++);
-		}
-		putchar_cb('\r');
-		putchar_cb('\n');
-		return 0;
-	} else {
-		return -1;
+		int n = fsize < rd_buffer_size ? fsize : rd_buffer_size;
+		for (int i = 0; i < n; i++)
+			rd_buffer[i] = *pfile++;
+		return n;
 	}
+	
+	return -1;
 }
 

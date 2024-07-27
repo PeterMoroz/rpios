@@ -1,8 +1,10 @@
 #include "uart.h"
 #include "mbox.h"
 #include "cpio.h"
+#include "heap.h"
 #include "utils.h"
 #include "strutils.h"
+#include "memutils.h"
 
 #define PM_PASSWORD 0x5a000000
 #define PM_RSTC ((volatile unsigned int *)0x3F10001c)
@@ -201,8 +203,24 @@ void list_files()
 
 void print_file(const char *fname)
 {
-	if (cpio_read_file(fname, &uart_send) != 0)
+	int fsize = cpio_file_size(fname);
+	if (fsize < 0) {
 		uart_puts("file not found\r\n");
+		return;
+	}
+
+	char *buffer = malloc(fsize);
+	memset(buffer, 0, fsize);
+	if (cpio_read_file(fname, buffer, fsize) < 0) {
+		uart_puts("could not read file\r\n");
+		return;
+	}
+
+	for (int i = 0; i < fsize; i++) {
+		uart_send(buffer[i]);
+	}
+	uart_send('\r');
+	uart_send('\n');
 }
 
 void kmain(void)
