@@ -1,6 +1,8 @@
 #include "uart.h"
 #include "mbox.h"
+#include "cpio.h"
 #include "utils.h"
+#include "strutils.h"
 
 #define PM_PASSWORD 0x5a000000
 #define PM_RSTC ((volatile unsigned int *)0x3F10001c)
@@ -16,29 +18,6 @@ void cancel_reset()
 {
 	*PM_RSTC = PM_PASSWORD;
 	*PM_WDOG = PM_PASSWORD;
-}
-
-int strcmp(const char *s1, const char *s2)
-{
-	int r = -1;
-	if (s1 == s2)
-		return 0;
-
-	if (s1 != 0 && s2 != 0) 
-	{
-		for (; *s1 == *s2; ++s1, ++s2)
-		{
-			if (*s1 == 0)
-			{
-				r = 0;
-				break;
-			}
-		}
-
-			if (r != 0)
-				r = *(const char *)s1 - *(const char *)s2;
-	}
-	return r;
 }
 
 void readline(char *buf, int maxlen) {
@@ -218,7 +197,7 @@ void print_board_revision()
 void kmain(void)
 {
 	int rst = 0;
-	char cmd[8];
+	char cmd[32];
 
 	uart_init();
 	load_kernel();
@@ -230,7 +209,7 @@ void kmain(void)
 		uart_send('>');
 		uart_send(' ');
 		
-		readline(cmd, 8);
+		readline(cmd, 32);
 		uart_puts(cmd);
 		uart_send('\r');
 		uart_send('\n');
@@ -252,6 +231,16 @@ void kmain(void)
 				rst = 1;
 			}
 
+		} else if (strcmp(cmd, "ls") == 0) {
+			cpio_read_catalog();
+		} else if (strncmp(cmd, "cat", 3) == 0) {
+			const char *fname = cmd + 3;
+			while (*fname && *fname == ' ')
+				fname++;
+			if (*fname) {
+				if (cpio_read_file(fname) != 0)
+					uart_puts("file not found!\r\n");
+			}
 		} else {
 			uart_puts("unknown command\n");
 		}
