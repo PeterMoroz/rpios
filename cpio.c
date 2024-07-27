@@ -2,8 +2,6 @@
 #include "strutils.h"
 #include "memutils.h"
 
-#include "uart.h"
-
 struct cpio_newc_header {
 	char c_magic[6];
 	char c_ino[8];
@@ -44,7 +42,7 @@ int hex_to_int(const char *s, int n)
 	return v;
 }
 
-void cpio_read_catalog()
+void cpio_read_catalog(putchar_cb_t putchar_cb)
 {
 	// const char *p = (char *)CPIO_ADDR;
 	const char *p = (char *)&_binary_ramdisk_start;
@@ -61,10 +59,10 @@ void cpio_read_catalog()
 		if (strncmp(buffer, "TRAILER!!!", sz - 1) == 0)
 			break;
 		for (int i = 0; i < (sz - 1); i++) {
-			uart_send(buffer[i]);
+			putchar_cb(buffer[i]);
 		}
-		uart_send('\r');
-		uart_send('\n');
+		putchar_cb('\r');
+		putchar_cb('\n');
 		while (((sz + sizeof(hdr)) & 0x3) != 0) {
 			sz++;
 		}
@@ -77,7 +75,7 @@ void cpio_read_catalog()
 	}
 }
 
-int cpio_read_file(const char *fname)
+int cpio_read_file(const char *fname, putchar_cb_t putchar_cb)
 {
 	// const char *p = (char *)CPIO_ADDR;
 	const char *p = (char *)&_binary_ramdisk_start;
@@ -121,10 +119,10 @@ int cpio_read_file(const char *fname)
 
 	if (found == 1) {
 		for (int i = 0; i < fsize; i++) {
-			uart_send(*pfile++);
+			putchar_cb(*pfile++);
 		}
-		uart_send('\r');
-		uart_send('\n');
+		putchar_cb('\r');
+		putchar_cb('\n');
 		return 0;
 	} else {
 		return -1;

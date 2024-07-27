@@ -194,6 +194,17 @@ void print_board_revision()
 	}
 }
 
+void list_files()
+{
+	cpio_read_catalog(&uart_send);
+}
+
+void print_file(const char *fname)
+{
+	if (cpio_read_file(fname, &uart_send) != 0)
+		uart_puts("file not found\r\n");
+}
+
 void kmain(void)
 {
 	int rst = 0;
@@ -232,15 +243,13 @@ void kmain(void)
 			}
 
 		} else if (strcmp(cmd, "ls") == 0) {
-			cpio_read_catalog();
+			list_files(); // cpio_read_catalog();
 		} else if (strncmp(cmd, "cat", 3) == 0) {
 			const char *fname = cmd + 3;
 			while (*fname && *fname == ' ')
 				fname++;
-			if (*fname) {
-				if (cpio_read_file(fname) != 0)
-					uart_puts("file not found!\r\n");
-			}
+			if (*fname)
+				print_file(fname);
 		} else {
 			uart_puts("unknown command\n");
 		}
