@@ -61,7 +61,7 @@ void uart_puts(char *s)
 	}
 }
 
-void uart_hex(unsigned char x) {
+void uart_hex(unsigned int x) {
 	unsigned int n;
 	int c;
 	for (c = 28; c >= 0; c -= 4) {
