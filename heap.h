@@ -1,6 +1,8 @@
 #ifndef __HEAP_H__
 #define __HEAP_H__
 
-void* malloc(unsigned size);
+#include <stddef.h>
+
+void* malloc(size_t size);
 
 #endif

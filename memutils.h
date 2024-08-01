@@ -1,8 +1,10 @@
 #ifndef __MEMUTILS_H__
 #define __MEMUTILS_H__
 
-int memcmp(const void *p1, const void *p2, int nbytes);
-void* memcpy(void *dst, const void *src, int nbytes);
-void* memset(void *p, char c, int n);
+#include <stddef.h>
+
+int memcmp(const void *p1, const void *p2, size_t nbytes);
+void* memcpy(void *dst, const void *src, size_t nbytes);
+void* memset(void *p, char c, size_t n);
 
 #endif

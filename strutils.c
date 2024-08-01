@@ -1,3 +1,5 @@
+#include "strutils.h"
+
 char* strcat(char *dst, const char *src)
 {
 	char *s1 = dst;
@@ -53,9 +55,9 @@ char* strcpy(char *s1, const char *s2)
 	return s1;
 }
 
-int strlen(const char *s)
+size_t strlen(const char *s)
 {
-	int len = 0;
+	size_t len = 0;
 	for (; s[len]; ++len) ;
 	return len;
 }
@@ -73,7 +75,7 @@ int strncmp(const char *s1, const char *s2, int n)
 }
 */
 
-int strncmp(const char *s1, const char *s2, int n)
+int strncmp(const char *s1, const char *s2, size_t n)
 {
 	while (n && *s1 && *s1 == *s2) 
 	{
@@ -86,3 +88,4 @@ int strncmp(const char *s1, const char *s2, int n)
 		return 0;
 	return (*(unsigned char *)s1 - *(unsigned char *)s2);
 }
+

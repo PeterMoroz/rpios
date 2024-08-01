@@ -3,7 +3,7 @@ CC=$(CROSS)gcc
 
 SRCS = $(wildcard *.c)
 OBJS = $(SRCS:.c=.o)
-CFLAGS=-Wall -O -ffreestanding -nostdinc -nostdlib -nostartfiles -g -mno-strict-align
+CFLAGS=-Wall -O -ffreestanding -nostdlib -nostartfiles -g -mno-strict-align
 
 
 all: kernel8.img

@@ -1,12 +1,12 @@
 #include "heap.h"
 
-extern unsigned char __bss_end;
+extern unsigned char _end;
 static unsigned char *heap = 0L;
 
-void* malloc(unsigned size)
+void* malloc(size_t size)
 {
 	if (heap == 0L)
-		heap = &__bss_end;
+		heap = &_end;
 
 	unsigned char *p = heap;
 	heap += size;
