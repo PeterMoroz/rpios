@@ -38,7 +38,7 @@ void uart_init()
 	*AUX_MU_CNTL = 3;
 }
 
-void uart_send(unsigned char c)
+void uart_send(char c)
 {
 	do { asm volatile("nop"); } while (!(*AUX_MU_LSR & 0x20));
 	*AUX_MU_IO = c;
@@ -52,7 +52,7 @@ char uart_getc()
 	return r;
 }
 
-void uart_puts(char *s)
+void uart_puts(const char *s)
 {
 	while (*s) {
 		if (*s == '\n')

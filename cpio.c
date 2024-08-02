@@ -20,7 +20,9 @@ struct cpio_newc_header {
 };
 
 // The address is specified in config.txt
-#define CPIO_ADDR 0x20000
+#define CPIO_ADDR 0x2000000
+// Default address at which QEMU load ramdisk
+// #define CPIO_ADDR 0x8000000
 
 extern volatile unsigned char _binary_ramdisk_start;
 
@@ -44,8 +46,7 @@ int hex_to_int(const char *s, int n)
 
 void cpio_read_catalog(putchar_cb_t putchar_cb)
 {
-	// const char *p = (char *)CPIO_ADDR;
-	const char *p = (char *)&_binary_ramdisk_start;
+	const char *p = (char *)CPIO_ADDR;
 
 	struct cpio_newc_header hdr;
 	
@@ -77,8 +78,7 @@ void cpio_read_catalog(putchar_cb_t putchar_cb)
 
 int cpio_file_size(const char *fname)
 {
-	// const char *p = (char *)CPIO_ADDR;
-	const char *p = (char *)&_binary_ramdisk_start;
+	const char *p = (char *)CPIO_ADDR;
 
 	struct cpio_newc_header hdr;
 	
@@ -117,8 +117,7 @@ int cpio_file_size(const char *fname)
 
 int cpio_read_file(const char *fname, char *rd_buffer, int rd_buffer_size)
 {
-	// const char *p = (char *)CPIO_ADDR;
-	const char *p = (char *)&_binary_ramdisk_start;
+	const char *p = (char *)CPIO_ADDR;
 
 	struct cpio_newc_header hdr;
 	
