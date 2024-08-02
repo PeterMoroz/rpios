@@ -33,10 +33,8 @@ uint32_t read_uint32_be(const uint8_t *p) {
 
 void fdt_parse_prop(const uint8_t **p)
 {
-	// uint32_t len = *(uint32_t *)(*p);
 	uint32_t len = read_uint32_be(*p);
 	(*p) += sizeof(uint32_t);
-	// uint32_t nameoff = *(uint32_t *)(*p);
 	// uint32_t nameoff = read_uint32_be(*p);
 	(*p) += sizeof(uint32_t);
 	// the name of property
@@ -60,13 +58,10 @@ void fdt_parse_node(const uint8_t **p, node_visit_callback node_visit_cb)
 	(*p) = (uint8_t *)(((int64_t)(*p) + (4 - 1)) & -4);
 
 	// read the next token (tag)
-	// uint32_t tag = *(uint32_t *)(*p);
 	uint32_t tag = read_uint32_be(*p);
 	(*p) += sizeof(uint32_t);
 	while (tag != FDT_END_NODE) {
 		if (tag == FDT_NOP) {
-		//	tag = *(uint32_t *)(*p);
-		//	(*p) += sizeof(uint32_t);
 			;
 		} else if (tag == FDT_PROP) {
 			fdt_parse_prop(p);
@@ -74,7 +69,6 @@ void fdt_parse_node(const uint8_t **p, node_visit_callback node_visit_cb)
 			fdt_parse_node(p, node_visit_cb);
 		}
 		
-		// tag = *(uint32_t *)(*p);
 		tag = read_uint32_be(*p);
 		(*p) += sizeof(uint32_t);
 	}
@@ -83,9 +77,7 @@ void fdt_parse_node(const uint8_t **p, node_visit_callback node_visit_cb)
 
 void fdt_parse(const uint8_t *buffer, node_visit_callback node_visit_cb) {
 	const uint8_t *p = (const uint8_t *)buffer;
-//	memcpy(&hdr, p, sizeof(hdr));
 	fdt_begin = p;
-//	p += sizeof(hdr);
 
 	hdr.magic = read_uint32_be(p);
 	p += sizeof(uint32_t);
