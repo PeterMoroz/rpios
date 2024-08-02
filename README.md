@@ -321,8 +321,183 @@ Initially the kernel image is written on SD-card into boot partition. When kerne
 
 During the transferring session RPi writes the new kernel image to the address in memory which differs from that one at which the currently running kernel started. When the image transferring is finished RPi jumps to a location where new image written and start execution of just received kernel.
 
+The jump to address is implemented with `br` instruction.
+```
+branch_to_address:
+    br x0
+```
+
+###### initial ramdisk
+Initial ramdisk is a ram-based block device, that is a simulated hard disk that uses memory instead of physical disk. Before the kernel boot the ramdisk is populated from CPIO archive. CPIO is pretty old (since 1990) but convenient way of packing files, directories and other filesystem objects into a sinngle contiguous bytestream.
+**CPIO format**
+Each filesystem object in archive consists of a header with basic numeric metadata which followed by the full path to the object and content of this object. The end of the archive is marked by special object with name 'TRAILER!!!'. There are different kind of header formats. One of them is 'New ASCII Format', it uses 8-byte hexadecimal fields for all numbers. The man
+
+```
+struct cpio_newc_header {
+»       char c_magic[6];
+»       char c_ino[8];
+»       char c_mode[8];
+»       char c_uid[8];
+»       char c_gid[8];
+»       char c_nlink[8];
+»       char c_mtime[8];
+»       char c_filesize[8];
+»       char c_devmajor[8];
+»       char c_devminor[8];
+»       char c_rdevmajor[8];
+»       char c_rdevminor[8];
+»       char c_namesize[8];
+»       char c_check[8];
+};
+
+```
+The pathname is followed by NUL bytes so that the total size of the fixed header plus pathname is a multiple of four. Likewise, the file data is padded to a multiple of four bytes.
+
+To apply this knowledge in practice I'm going to write two functions: the first one of them reads content of CPIO archive and print it, the second function prints the content of a file specified with its name.
+
+The both functions are working by the same principle:
+* read the header
+* get the length of a filepath and the length of a file
+* read the filepath (and content of the file if needed)
+Repeat these steps untill reach the object with reserved name 'TRAILER!!!'.
+
+The initial implementation of this function called on the service function of the  UART module. It is not good from design point of view and I rewrote both functions so that they invoke a callback function which handle symbols which are read from ramdisk (either filepath or content of a file). The prototypes are:
+```
+void cpio_read_catalog(putchar_cb_t putchar_cb);
+int cpio_read_file(const char *fname, putchar_cb_t putchar_cb);
+```
+And an example of usage:
+```
+void list_files()
+{
+»       cpio_read_catalog(&uart_send);
+}
+```
+
+
+There are two ways to load the CPIO archive into memory:
+* the simple way is *statically link*. The ramdisk content is accessible in code by the label *_binary_ramdisk_start*.
+* ask the GPU to load ramdisk with one of the two options of the `config.txt`
+    - `ramfsfile=(filename)` - will load the file after kernel image. The ramdisk will be accessible at the label *_end* defined by linker script.
+    - `initramfs (filename) (address)` - will load the file into a specified location. The ramdisk will be accessible at *address*.
+
+Initially I chose the statically linking. I needed to make some changes in the `Makefile` (ramdisk is name of the file which contains CPIO archive):
+```
+rd.o: ramdisk
+»       $(CROSS)ld -r -b binary -o rd.o ramdisk
+
+...
+kernel8.elf: start.o utils.o $(OBJS) rd.o kernel.ld
+»       $(CROSS)ld -nostdlib -nostartfiles start.o rd.o utils.o $(OBJS) -T kernel.ld -o $@
+
+```
+
+Later, when I opted to loading the ramdisk by the GPU, these lines in the `Makefile` lost sense and I removed them.
+But now I need to copy the file `ramdisk` to the SD-card, add the following line into the file `config.txt`
+
+```
+initramfs ramdisk 0x20000
+```
+and use the specified address in the code which read the ramdisk content.
+
+
+###### memory allocator
+Memory allocator is a mechanism which allows an allocation of memory block of arbitrary size. Its a vaste topic to discuss, for this lab just make it as simple as possible. Our allocator should provide a function which returns a pointer to memory block of requested size. The memory block has to be contigous. The memory blocks will be allocated from the area following immediatelly the BSS serction. We  can get the starting address of this area using the symbol `_end` that declared in the linker script.
+Every time when the memory block is requested the current pointer will be incremented by the requested size.
+```
+void* malloc(unsigned size)
+{
+»       if (heap == 0L)
+»       »       heap = &_end;
+
+»       unsigned char *p = heap;
+»       heap += size;
+»       return p;
+}
+```
+
+Let's rewrite function which read a file from CPIO archive. Instead of callback function which print the symbols it would accept address of the buffer start and the capacity of that buffer.
+```
+int cpio_read_file(const char *fname, char *buffer, int buffer_size);
+```
+
+The client function `void print_file(const char *fname)` will query the filesize, allocate a buffer to read file content, call the function reading file content into buffer and finally print that content.
+```
+»       int fsize = cpio_file_size(fname);
+»       if (fsize < 0) {
+»       »       uart_puts("file not found\r\n");
+»       »       return;
+»       }
+
+»       char *buffer = malloc(fsize);
+»       memset(buffer, 0, fsize); 
+»       if (cpio_read_file(fname, buffer, fsize) < 0) {
+»       »       uart_puts("could not read file\r\n");
+»       »       return;
+»       }
+
+»       for (int i = 0; i < fsize; i++) {
+»       »       uart_send(buffer[i]);
+»       }
+»       uart_send('\r');
+»       uart_send('\n');
+```
+
+###### device tree
+A device tree is a hierarchical data structure ofter used to describe the hardware components and their configuration in a system. A device tree source (DTS) is a human-readable representation of the tree. The device tree compiler (DTC) is used to convert the DTS to a binary device tree blob (DTB) that can be used by software like a bootloader of the kernel.
+The figure below shows the layout of the blob of data containing the device tree. It has three sections of variable size: the *memory reservation table*, ythe *structure block* and the *strings block*. A small header gives the blob's size and version and location of the three sections,
+
+           *offset*
+
+            0x00 ---------------------
+                 | magic number      |
+            0x04 |-------------------|
+                 | total size        |
+            0x08 |-------------------|
+                 | off dt struct     |
+            0x0C |-------------------|
+                 | off dt strings    |
+            0x10 |-------------------|
+                 | off mem rsvmap    |
+            0x14 |-------------------|
+                 | version           |
+            0x18 |-------------------|
+                 | last comp version |
+            0x1C |-------------------|
+                 | boot cpuid phys   |
+            0x20 |-------------------|
+                 | size dt strings   |
+            0x24 |-------------------|
+                       ......
+                       ......
+  off mem rsvmap |-------------------|
+                 |      memory       |
+                 | reservation block |
+                 |-------------------|
+                       ......
+                       ......
+   off dt struct |-------------------|
+                 |                   |
+                 |  structure block  |
+                 |                   |
+                 |-------------------|
+                       ......
+                       ......
+  off dt strings |-------------------|
+                 |                   |
+                 |   strings block   |
+                 |                   |
+                 |-------------------|
+
+The memory reserve map section gives a list of regions of memory that the kernel must not use. The list is represented as a simple array of (address, size)) pairs of 64 bit values, terminated by a zero size entry. The strings block is similarly simple, consisting of a number of null-terminated strings appended together, which are referenced from the structure block as described below.
+The structure block contains the device tree nodes. Each node is introduced with a 32-bit DT_BEGIN_NODE flag, followed bu the node's name as a null-terminated string, padded to a 32-bit boundary. Then follows all of the properties of the node, each introduced with a DT_PROP tag, then all of the node's subnodes, each introduced with their own DT_BEGIN_NODE tag. The node ends with an DT_END_NODE tag, and after the DT_END_NODE for the root node is an DT_END tag, indicating the end of the whole tree. 
+Each property, after the DT_PROP tag, has a 32-bit value giving an offset from the beginning of the strings block at which the property name is stored. The name offset is followed by the length of the property value (as a 32-bit value) and then the data itself padded to a 32-bit boundary.
+
 
 ##### references
 [Linux Serial Ports Using C/C++](https://blog.mbedded.ninja/programming/operating-systems/linux/linux-serial-ports-using-c-cpp/
 [Booting your own kernel on RPi via UART](https://blog.nicolasmesa.co/posts/2019/08/booting-your-own-kernel-on-raspberry-pi-via-uart/)
 [XModem protocol with CRC](http://ee6115.mit.edu/amulet/xmodem.htm)
+[initramfs buffer format](https://docs.kernel.org/driver-api/early-userspace/buffer-format.html)
+[Flattened Devicetree (DTB) Format](https://devicetree-specification.readthedocs.io/en/stable/flattened-format.html)
+[Device tree everywhere](https://ozlabs.org/~dgibson/papers/dtc-paper.pdf)
