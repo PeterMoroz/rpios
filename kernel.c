@@ -242,11 +242,9 @@ void fdt_node_visit(const uint8_t *node)
 				const char *name = fdt_get_string(nameoff);
 				if (strcmp(name, "linux,initrd-start") == 0) {
 					uint32_t initrd_start = read_uint32_be(p);
-					uart_puts("initrd start: ");
-					uart_hex(initrd_start);
-					uart_send('\r');
-					uart_send('\n');
+					cpio_set_initrd_start(initrd_start);
 				}
+				/*
 				if (strcmp(name, "linux,initrd-end") == 0) {
 					uint32_t initrd_end = read_uint32_be(p);
 					uart_puts("initrd end: ");
@@ -254,6 +252,7 @@ void fdt_node_visit(const uint8_t *node)
 					uart_send('\r');
 					uart_send('\n');
 				}
+				*/
 				p += len;
 				p = (uint8_t *)(((int64_t)p + (4 - 1)) & -4);
 			}
@@ -263,7 +262,7 @@ void fdt_node_visit(const uint8_t *node)
 	}
 }
 
-void kmain(unsigned long dtb_ptr32)
+void kmain(uint64_t dtb_ptr32)
 {
 	int rst = 0;
 	char cmd[32];

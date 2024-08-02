@@ -20,11 +20,11 @@ struct cpio_newc_header {
 };
 
 // The address is specified in config.txt
-#define CPIO_ADDR 0x2000000
+// #define INITRD_ADDR 0x2000000
 // Default address at which QEMU load ramdisk
-// #define CPIO_ADDR 0x8000000
+#define INITRD_START 0x8000000
 
-extern volatile unsigned char _binary_ramdisk_start;
+static uint8_t *initrd_start = NULL;
 
 int hex_to_int(const char *s, int n)
 {
@@ -46,7 +46,7 @@ int hex_to_int(const char *s, int n)
 
 void cpio_read_catalog(putchar_cb_t putchar_cb)
 {
-	const char *p = (char *)CPIO_ADDR;
+	const uint8_t *p = initrd_start != NULL ? initrd_start : (uint8_t *)INITRD_START;
 
 	struct cpio_newc_header hdr;
 	
@@ -64,21 +64,18 @@ void cpio_read_catalog(putchar_cb_t putchar_cb)
 		}
 		putchar_cb('\r');
 		putchar_cb('\n');
-		while (((sz + sizeof(hdr)) & 0x3) != 0) {
-			sz++;
-		}
+		
 		p += sz;
+		p = (uint8_t *)(((int64_t)p + (4 - 1)) & -4);
 		sz = hex_to_int(hdr.c_filesize, 8);
-		while ((sz & 0x3) != 0) {
-			sz++;
-		}
 		p += sz;
+		p = (uint8_t *)(((int64_t)p + (4 - 1)) & -4);
 	}
 }
 
 int cpio_file_size(const char *fname)
 {
-	const char *p = (char *)CPIO_ADDR;
+	const uint8_t *p = initrd_start != NULL ? initrd_start : (uint8_t *)INITRD_START;
 
 	struct cpio_newc_header hdr;
 	
@@ -99,31 +96,27 @@ int cpio_file_size(const char *fname)
 			found = 1;
 		}
 
-		while (((sz + sizeof(hdr)) & 0x3) != 0) {
-			sz++;
-		}
 		p += sz;
+		p = (uint8_t *)(((int64_t)p + (4 - 1)) & -4);
 		sz = hex_to_int(hdr.c_filesize, 8);
 		if (found == 1) {
 			return sz;
 		}
-		while ((sz & 0x3) != 0) {
-			sz++;
-		}
 		p += sz;
+		p = (uint8_t *)(((int64_t)p + (4 - 1)) & -4);
 	}
 	return -1;
 }
 
 int cpio_read_file(const char *fname, char *rd_buffer, int rd_buffer_size)
 {
-	const char *p = (char *)CPIO_ADDR;
+	const uint8_t *p = initrd_start != NULL ? initrd_start : (uint8_t *)INITRD_START;
 
 	struct cpio_newc_header hdr;
 	
 	char buffer[16];
 	int fsize = 0;
-	const char *pfile = 0L;
+	const char *pfile = NULL;
 	char found = 0;
 	while (1) {
 		memcpy(&hdr, p, sizeof(hdr));
@@ -140,29 +133,29 @@ int cpio_read_file(const char *fname, char *rd_buffer, int rd_buffer_size)
 			found = 1;
 		}
 		
-		while (((sz + sizeof(hdr)) & 0x3) != 0) {
-			sz++;
-		}
 		p += sz;
+		p = (uint8_t *)(((int64_t)p + (4 - 1)) & -4);
 		sz = hex_to_int(hdr.c_filesize, 8);
 		if (found == 1) {
 			fsize = sz;
-			pfile = p;
+			pfile = (const char *)p;
 			break;
 		}
-		while ((sz & 0x3) != 0) {
-			sz++;
-		}
 		p += sz;
+		p = (uint8_t *)(((int64_t)p + (4 - 1)) & -4);
 	}
 
 	if (found == 1) {
 		int n = fsize < rd_buffer_size ? fsize : rd_buffer_size;
-		for (int i = 0; i < n; i++)
-			rd_buffer[i] = *pfile++;
+		memcpy(rd_buffer, pfile, n);
 		return n;
 	}
 	
 	return -1;
+}
+
+void cpio_set_initrd_start(uint64_t addr)
+{
+	initrd_start = (uint8_t *)addr;
 }
 
