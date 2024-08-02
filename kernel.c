@@ -2,9 +2,11 @@
 #include "mbox.h"
 #include "cpio.h"
 #include "heap.h"
+#include "fdt.h"
 #include "utils.h"
 #include "strutils.h"
 #include "memutils.h"
+
 
 #define PM_PASSWORD 0x5a000000
 #define PM_RSTC ((volatile unsigned int *)0x3F10001c)
@@ -223,7 +225,45 @@ void print_file(const char *fname)
 	uart_send('\n');
 }
 
-void kmain(void)
+void fdt_node_visit(const uint8_t *node)
+{
+	const char *s = (const char *)node;
+	if (strcmp(s, "chosen") == 0) {
+		const uint8_t *p = (const uint8_t *)s;
+		p = (uint8_t *)(((int64_t)p + (4 - 1)) & -4);
+		uint32_t tag = read_uint32_be(p);
+		p += sizeof(uint32_t);
+		while (tag != FDT_END_NODE) {
+			if (tag == FDT_PROP) {
+				uint32_t len = read_uint32_be(p);
+				p += sizeof(uint32_t);
+				uint32_t nameoff = read_uint32_be(p);
+				p += sizeof(uint32_t);
+				const char *name = fdt_get_string(nameoff);
+				if (strcmp(name, "linux,initrd-start") == 0) {
+					uint32_t initrd_start = read_uint32_be(p);
+					uart_puts("initrd start: ");
+					uart_hex(initrd_start);
+					uart_send('\r');
+					uart_send('\n');
+				}
+				if (strcmp(name, "linux,initrd-end") == 0) {
+					uint32_t initrd_end = read_uint32_be(p);
+					uart_puts("initrd end: ");
+					uart_hex(initrd_end);
+					uart_send('\r');
+					uart_send('\n');
+				}
+				p += len;
+				p = (uint8_t *)(((int64_t)p + (4 - 1)) & -4);
+			}
+			tag = read_uint32_be(p);
+			p += sizeof(uint32_t);
+		}
+	}
+}
+
+void kmain(unsigned long dtb_ptr32)
 {
 	int rst = 0;
 	char cmd[32];
@@ -233,6 +273,8 @@ void kmain(void)
 
 	print_board_sn();
 	print_board_revision();
+
+	fdt_parse((const uint8_t *)dtb_ptr32, fdt_node_visit);
 
 	while (1) {
 		uart_send('>');
