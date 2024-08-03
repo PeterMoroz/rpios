@@ -1,6 +1,7 @@
 #ifndef __MBOX_H__
 #define __MBOX_H__
 
+#include <stdint.h>
 
 #define MBOX_REQUEST          0x00000000
 #define MBOX_RESPONSE_SUCCESS 0x80000000
@@ -19,8 +20,8 @@
 #define MBOX_TAG_LAST        0x00000000
 
 
-unsigned mbox_compose(unsigned char ch, unsigned data);
-void mbox_put(unsigned mail);
-unsigned mbox_get(void);
+uint32_t mbox_compose(uint8_t ch, uint32_t data);
+void mbox_put(uint32_t mail);
+uint32_t mbox_get(void);
 
 #endif

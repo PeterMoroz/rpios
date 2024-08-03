@@ -1,21 +1,21 @@
 #include "gpio.h"
 
-#define AUX_ENABLE     ((volatile unsigned int*)(MMIO_BASE + 0x00215004))
-#define AUX_MU_IO     ((volatile unsigned int*)(MMIO_BASE + 0x00215040))
-#define AUX_MU_IER     ((volatile unsigned int*)(MMIO_BASE + 0x00215044))
-#define AUX_MU_IIR     ((volatile unsigned int*)(MMIO_BASE + 0x00215048))
-#define AUX_MU_LCR     ((volatile unsigned int*)(MMIO_BASE + 0x0021504C))
-#define AUX_MU_MCR     ((volatile unsigned int*)(MMIO_BASE + 0x00215050))
-#define AUX_MU_LSR     ((volatile unsigned int*)(MMIO_BASE + 0x00215054))
-#define AUX_MU_MSR     ((volatile unsigned int*)(MMIO_BASE + 0x00215058))
-#define AUX_MU_SCRATCH ((volatile unsigned int*)(MMIO_BASE + 0x0021505C))
-#define AUX_MU_CNTL ((volatile unsigned int*)(MMIO_BASE + 0x00215060))
-#define AUX_MU_STAT ((volatile unsigned int*)(MMIO_BASE + 0x00215064))
-#define AUX_MU_BAUD ((volatile unsigned int*)(MMIO_BASE + 0x00215068))
+#define AUX_ENABLE     ((volatile uint32_t*)(MMIO_BASE + 0x00215004))
+#define AUX_MU_IO     ((volatile uint32_t*)(MMIO_BASE + 0x00215040))
+#define AUX_MU_IER     ((volatile uint32_t*)(MMIO_BASE + 0x00215044))
+#define AUX_MU_IIR     ((volatile uint32_t*)(MMIO_BASE + 0x00215048))
+#define AUX_MU_LCR     ((volatile uint32_t*)(MMIO_BASE + 0x0021504C))
+#define AUX_MU_MCR     ((volatile uint32_t*)(MMIO_BASE + 0x00215050))
+#define AUX_MU_LSR     ((volatile uint32_t*)(MMIO_BASE + 0x00215054))
+#define AUX_MU_MSR     ((volatile uint32_t*)(MMIO_BASE + 0x00215058))
+#define AUX_MU_SCRATCH ((volatile uint32_t*)(MMIO_BASE + 0x0021505C))
+#define AUX_MU_CNTL ((volatile uint32_t*)(MMIO_BASE + 0x00215060))
+#define AUX_MU_STAT ((volatile uint32_t*)(MMIO_BASE + 0x00215064))
+#define AUX_MU_BAUD ((volatile uint32_t*)(MMIO_BASE + 0x00215068))
 
 void uart_init()
 {
-	register unsigned int r;
+	register uint32_t r;
 
 	*AUX_ENABLE |= 1;
 	*AUX_MU_CNTL = 0;
@@ -61,8 +61,8 @@ void uart_puts(const char *s)
 	}
 }
 
-void uart_hex(unsigned int x) {
-	unsigned int n;
+void uart_hex(uint32_t x) {
+	uint32_t n;
 	int c;
 	for (c = 28; c >= 0; c -= 4) {
 		n = (x >> c) & 0xF;

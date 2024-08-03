@@ -9,10 +9,10 @@
 
 
 #define PM_PASSWORD 0x5a000000
-#define PM_RSTC ((volatile unsigned int *)0x3F10001c)
-#define PM_WDOG ((volatile unsigned int *)0x3F100024)
+#define PM_RSTC ((volatile uint32_t *)0x3F10001c)
+#define PM_WDOG ((volatile uint32_t *)0x3F100024)
 
-void schedule_reset(int tick) 
+void schedule_reset(uint32_t tick) 
 {
 	*PM_RSTC = PM_PASSWORD | 0x20;
 	*PM_WDOG = PM_PASSWORD | tick;
@@ -24,8 +24,8 @@ void cancel_reset()
 	*PM_WDOG = PM_PASSWORD;
 }
 
-void readline(char *buf, int maxlen) {
-       int n = 0;
+void readline(char *buf, size_t maxlen) {
+       size_t n = 0;
        while (n < maxlen - 1) {
 	       char c = uart_getc();
 	       if (c == '\n' || c == '\r' || c == '\0')
@@ -140,7 +140,7 @@ void load_kernel() {
 
 void print_board_sn()
 {
-	volatile unsigned __attribute__((aligned(16))) mbox[8];
+	volatile uint32_t __attribute__((aligned(16))) mbox[8];
 	mbox[0] = 8 * 4;
 	mbox[1] = MBOX_REQUEST;
 	mbox[2] = MBOX_TAG_GETSERIAL;
@@ -150,8 +150,8 @@ void print_board_sn()
 	mbox[6] = 0;
 	mbox[7] = MBOX_TAG_LAST;
 
-	unsigned data = (unsigned long)&mbox[0] >> 4;
-	unsigned mail = mbox_compose(MBOX_CH_PROP, data);
+	uint32_t data = (uint64_t)&mbox[0] >> 4;
+	uint32_t mail = mbox_compose(MBOX_CH_PROP, data);
 	mbox_put(mail);
 	while (1) {
 		if (mail == mbox_get())
@@ -171,7 +171,7 @@ void print_board_sn()
 
 void print_board_revision()
 {
-	volatile unsigned __attribute__((aligned(16))) mbox[7];
+	volatile uint32_t __attribute__((aligned(16))) mbox[7];
 	mbox[0] = 7 * 4;
 	mbox[1] = MBOX_REQUEST;
 	mbox[2] = MBOX_TAG_GETREVISION;
@@ -180,8 +180,8 @@ void print_board_revision()
 	mbox[5] = 0;
 	mbox[6] = MBOX_TAG_LAST;
 
-	unsigned data = (unsigned long)&mbox[0] >> 4;
-	unsigned mail = mbox_compose(MBOX_CH_PROP, data);
+	uint32_t data = (uint64_t)&mbox[0] >> 4;
+	uint32_t mail = mbox_compose(MBOX_CH_PROP, data);
 	mbox_put(mail);
 	while (1) {
 		if (mail == mbox_get())
@@ -314,3 +314,4 @@ void kmain(uint64_t dtb_ptr32)
 		}
 	}
 }
+
