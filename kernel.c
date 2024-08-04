@@ -62,7 +62,7 @@ int crc16(const char *data, int size) {
 void load_kernel() {
 	char c;
 	while (1) {
-		uart_send(0x43);
+		uart_putc(0x43);
 		c = uart_getc();
 		if (c == 0x00)
 			return;
@@ -90,9 +90,9 @@ void load_kernel() {
 				char c2 = uart_getc();
 
 				if ((unsigned short)n1 + (unsigned short)n2 != 0xFF) {
-					uart_send(0x15);
+					uart_putc(0x15);
 				} else if ((unsigned short)n1 != packet_num) {
-					uart_send(0x15);
+					uart_putc(0x15);
 				} else {
 					// TO DO: fix CRC check failed.
 					/*
@@ -100,32 +100,32 @@ void load_kernel() {
 					crc = crc << 8;
 					crc |= c2 & 0xFF;
 					if (crc != crc16(data_buffer, 128)) {
-						uart_send(0x15);
+						uart_putc(0x15);
 					} else {
 						// TO DO: write piece of kernel
 						packet_num++;
-						uart_send(0x06);
+						uart_putc(0x06);
 					}
 					*/
 					unsigned char crc = crc8(data_buffer, 128);
 					if (crc != (unsigned char)c1 || crc != (unsigned char)c2) {
-						uart_send(0x15);
+						uart_putc(0x15);
 					} else {
 						for (int i = 0; i < 128; i++) {
 							*kernel++ = data_buffer[i];
 						}
 						packet_num++;
-						uart_send(0x06);
+						uart_putc(0x06);
 					}
 				}
 			}
 			break;
 			case 0x04: { // EOT - End Of Transmission
-				uart_send(0x06);
+				uart_putc(0x06);
 			}
 			break;
 			case 0x17: { // ETB - End of Transmission Block
-				uart_send(0x06);
+				uart_putc(0x06);
 				branch_to_address((void *)0x00);
 				// return;
 			}
@@ -162,10 +162,10 @@ void print_board_sn()
 		uart_puts("can't read board S/N\n");
 	} else {
 		uart_puts("The board S/N: ");
-		uart_hex(mbox[6]);
-		uart_hex(mbox[5]);
-		uart_send('\r');
-		uart_send('\n');
+		uart_put_uint32_hex(mbox[6]);
+		uart_put_uint32_hex(mbox[5]);
+		uart_putc('\r');
+		uart_putc('\n');
 	}
 }
 
@@ -192,15 +192,15 @@ void print_board_revision()
 		uart_puts("can't read board revision\n");
 	} else {
 		uart_puts("The board revision: ");
-		uart_hex(mbox[5]);
-		uart_send('\r');
-		uart_send('\n');
+		uart_put_uint32_hex(mbox[5]);
+		uart_putc('\r');
+		uart_putc('\n');
 	}
 }
 
 void list_files()
 {
-	cpio_read_catalog(&uart_send);
+	cpio_read_catalog(&uart_putc);
 }
 
 void print_file(const char *fname)
@@ -219,10 +219,10 @@ void print_file(const char *fname)
 	}
 
 	for (int i = 0; i < fsize; i++) {
-		uart_send(buffer[i]);
+		uart_putc(buffer[i]);
 	}
-	uart_send('\r');
-	uart_send('\n');
+	uart_putc('\r');
+	uart_putc('\n');
 }
 
 void fdt_node_visit(const uint8_t *node)
@@ -248,9 +248,9 @@ void fdt_node_visit(const uint8_t *node)
 				if (strcmp(name, "linux,initrd-end") == 0) {
 					uint32_t initrd_end = read_uint32_be(p);
 					uart_puts("initrd end: ");
-					uart_hex(initrd_end);
-					uart_send('\r');
-					uart_send('\n');
+					uart_put_uint32_hex(initrd_end);
+					uart_putc('\r');
+					uart_putc('\n');
 				}
 				*/
 				p += len;
@@ -276,13 +276,13 @@ void kmain(uint64_t dtb_ptr32)
 	fdt_parse((const uint8_t *)dtb_ptr32, fdt_node_visit);
 
 	while (1) {
-		uart_send('>');
-		uart_send(' ');
+		uart_putc('>');
+		uart_putc(' ');
 		
 		readline(cmd, 32);
 		uart_puts(cmd);
-		uart_send('\r');
-		uart_send('\n');
+		uart_putc('\r');
+		uart_putc('\n');
 		
 		if (strcmp(cmd, "help") == 0) {
 			uart_puts("help   : print this help menu\n");

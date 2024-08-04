@@ -370,7 +370,7 @@ And an example of usage:
 ```
 void list_files()
 {
-»       cpio_read_catalog(&uart_send);
+»       cpio_read_catalog(&uart_putc);
 }
 ```
 
@@ -437,10 +437,10 @@ The client function `void print_file(const char *fname)` will query the filesize
 »       }
 
 »       for (int i = 0; i < fsize; i++) {
-»       »       uart_send(buffer[i]);
+»       »       uart_putc(buffer[i]);
 »       }
-»       uart_send('\r');
-»       uart_send('\n');
+»       uart_putc('\r');
+»       uart_putc('\n');
 ```
 
 ###### device tree

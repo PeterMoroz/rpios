@@ -38,7 +38,7 @@ void uart_init()
 	*AUX_MU_CNTL = 3;
 }
 
-void uart_send(char c)
+void uart_putc(char c)
 {
 	do { asm volatile("nop"); } while (!(*AUX_MU_LSR & 0x20));
 	*AUX_MU_IO = c;
@@ -56,18 +56,18 @@ void uart_puts(const char *s)
 {
 	while (*s) {
 		if (*s == '\n')
-			uart_send('\r');
-		uart_send(*s++);
+			uart_putc('\r');
+		uart_putc(*s++);
 	}
 }
 
-void uart_hex(uint32_t x) {
+void uart_put_uint32_hex(uint32_t x) {
 	uint32_t n;
 	int c;
 	for (c = 28; c >= 0; c -= 4) {
 		n = (x >> c) & 0xF;
 		n += n > 9 ? 0x37 : 0x30;
-		uart_send(n);
+		uart_putc(n);
 	}
 }
 
