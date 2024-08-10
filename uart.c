@@ -61,10 +61,22 @@ void uart_puts(const char *s)
 	}
 }
 
-void uart_put_uint32_hex(uint32_t x) {
+void uart_put_uint32_hex(uint32_t x) 
+{
 	uint32_t n;
 	int c;
 	for (c = 28; c >= 0; c -= 4) {
+		n = (x >> c) & 0xF;
+		n += n > 9 ? 0x37 : 0x30;
+		uart_putc(n);
+	}
+}
+
+void uart_put_uint64_hex(uint64_t x) 
+{
+	uint64_t n;
+	int c;
+	for (c = 60; c >= 0; c -= 4) {
 		n = (x >> c) & 0xF;
 		n += n > 9 ? 0x37 : 0x30;
 		uart_putc(n);

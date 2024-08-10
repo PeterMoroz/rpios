@@ -8,5 +8,6 @@ void uart_putc(char c);
 char uart_getc();
 void uart_puts(const char *s);
 void uart_put_uint32_hex(uint32_t x);
+void uart_put_uint64_hex(uint64_t x);
 
 #endif
