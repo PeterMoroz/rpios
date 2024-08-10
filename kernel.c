@@ -12,13 +12,19 @@
 #define PM_RSTC ((volatile uint32_t *)0x3F10001c)
 #define PM_WDOG ((volatile uint32_t *)0x3F100024)
 
-void schedule_reset(uint32_t tick) 
+#define USER_STACK_SIZE 512
+
+extern void init_exception_table();
+
+extern void userprogram();
+
+void schedule_reset(uint32_t tick)
 {
 	*PM_RSTC = PM_PASSWORD | 0x20;
 	*PM_WDOG = PM_PASSWORD | tick;
 }
 
-void cancel_reset() 
+void cancel_reset()
 {
 	*PM_RSTC = PM_PASSWORD;
 	*PM_WDOG = PM_PASSWORD;
@@ -35,6 +41,9 @@ void readline(char *buf, size_t maxlen) {
        buf[n] = '\0';
 }
 
+/* TODO: 
+ * rewrite using clearly defined integer types
+ */
 unsigned char crc8(const char *data, int size) {
 	unsigned char crc = 0;
 	for (int i = 0; i < size; i++)
@@ -42,6 +51,9 @@ unsigned char crc8(const char *data, int size) {
 	return crc;
 }
 
+/* TODO:
+ * rewrite using clearly defined integer types
+ */
 int crc16(const char *data, int size) {
 	int crc = 0;
 	unsigned char i = 0;
@@ -59,6 +71,9 @@ int crc16(const char *data, int size) {
 	return crc;
 }
 
+/* TO DO:
+ * rewrite using clearly defined integer types
+ */
 void load_kernel() {
 	char c;
 	while (1) {
@@ -225,6 +240,21 @@ void print_file(const char *fname)
 	uart_putc('\n');
 }
 
+/*
+void execute_userprogram() 
+{
+	uint64_t el = get_el();
+	uart_puts("current EL: ");
+	uart_put_uint32_hex(el);
+	uart_putc('\r');
+	uart_putc('\n');
+
+	uint8_t *stack = malloc(USER_STACK_SIZE);
+	uart_puts("switching to EL0 to execute userprogram\r\n");
+	execute_in_el0(&userprogram, stack);
+}
+*/
+
 void fdt_node_visit(const uint8_t *node)
 {
 	const char *s = (const char *)node;
@@ -268,12 +298,17 @@ void kmain(uint64_t dtb_ptr32)
 	char cmd[32];
 
 	uart_init();
-	load_kernel();
+	// load_kernel();
+	
+	init_exception_table();
+
+	// execute_userprogram();
 
 	print_board_sn();
 	print_board_revision();
 
 	fdt_parse((const uint8_t *)dtb_ptr32, fdt_node_visit);
+
 
 	while (1) {
 		uart_putc('>');
@@ -302,13 +337,18 @@ void kmain(uint64_t dtb_ptr32)
 			}
 
 		} else if (strcmp(cmd, "ls") == 0) {
-			list_files(); // cpio_read_catalog();
+			list_files();
 		} else if (strncmp(cmd, "cat", 3) == 0) {
 			const char *fname = cmd + 3;
 			while (*fname && *fname == ' ')
 				fname++;
 			if (*fname)
 				print_file(fname);
+		} else if (strcmp(cmd, "exec") == 0) {
+			// execute_userprogram();
+			uint8_t *stack = malloc(USER_STACK_SIZE);
+			if (cpio_exec_file("userprogram", stack) != 0)
+				uart_puts("execute userprogram failed\r\n");
 		} else {
 			uart_puts("unknown command\n");
 		}

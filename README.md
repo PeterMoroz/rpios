@@ -310,7 +310,7 @@ The goals of this lab are:
 * Implement a simple memory allocator
 * Add support of device tree
 
-###### load the kernel image through UART
+#### Load the kernel image through UART
 Initially the kernel image is written on SD-card into boot partition. When kernel starts it is loaded into memory and starts execution from predefined address. Then it make attempt to load a new kernel image via UART (the UART must be initialized at that moment). The kernel image is transferred via the simplified implementation of XModem communication protocol:
 * send a special command to opposite device which initiates the transfer session.
 * the opposite device responds either with XModem packet or special command (not specified by XModem protocol, just my workaround) which tells to RPi to cancel session and continue with current kernel.
@@ -327,7 +327,7 @@ branch_to_address:
     br x0
 ```
 
-###### initial ramdisk
+#### Initial ramdisk
 Initial ramdisk is a ram-based block device, that is a simulated hard disk that uses memory instead of physical disk. Before the kernel boot the ramdisk is populated from CPIO archive. CPIO is pretty old (since 1990) but convenient way of packing files, directories and other filesystem objects into a sinngle contiguous bytestream.
 **CPIO format**
 Each filesystem object in archive consists of a header with basic numeric metadata which followed by the full path to the object and content of this object. The end of the archive is marked by special object with name 'TRAILER!!!'. There are different kind of header formats. One of them is 'New ASCII Format', it uses 8-byte hexadecimal fields for all numbers. The man
@@ -401,7 +401,7 @@ initramfs ramdisk 0x20000
 and use the specified address in the code which read the ramdisk content.
 
 
-###### memory allocator
+#### Memory allocator
 Memory allocator is a mechanism which allows an allocation of memory block of arbitrary size. Its a vaste topic to discuss, for this lab just make it as simple as possible. Our allocator should provide a function which returns a pointer to memory block of requested size. The memory block has to be contigous. The memory blocks will be allocated from the area following immediatelly the BSS serction. We  can get the starting address of this area using the symbol `_end` that declared in the linker script.
 Every time when the memory block is requested the current pointer will be incremented by the requested size.
 ```
@@ -443,7 +443,7 @@ The client function `void print_file(const char *fname)` will query the filesize
 »       uart_putc('\n');
 ```
 
-###### device tree
+#### Device tree
 A device tree is a hierarchical data structure ofter used to describe the hardware components and their configuration in a system. A device tree source (DTS) is a human-readable representation of the tree. The device tree compiler (DTC) is used to convert the DTS to a binary device tree blob (DTB) that can be used by software like a bootloader of the kernel.
 The figure below shows the layout of the blob of data containing the device tree. It has three sections of variable size: the *memory reservation table*, ythe *structure block* and the *strings block*. A small header gives the blob's size and version and location of the three sections,
 
@@ -493,7 +493,6 @@ The memory reserve map section gives a list of regions of memory that the kernel
 The structure block contains the device tree nodes. Each node is introduced with a 32-bit DT_BEGIN_NODE flag, followed bu the node's name as a null-terminated string, padded to a 32-bit boundary. Then follows all of the properties of the node, each introduced with a DT_PROP tag, then all of the node's subnodes, each introduced with their own DT_BEGIN_NODE tag. The node ends with an DT_END_NODE tag, and after the DT_END_NODE for the root node is an DT_END tag, indicating the end of the whole tree. 
 Each property, after the DT_PROP tag, has a 32-bit value giving an offset from the beginning of the strings block at which the property name is stored. The name offset is followed by the length of the property value (as a 32-bit value) and then the data itself padded to a 32-bit boundary.
 
-
 ##### references
 [Linux Serial Ports Using C/C++](https://blog.mbedded.ninja/programming/operating-systems/linux/linux-serial-ports-using-c-cpp/
 [Booting your own kernel on RPi via UART](https://blog.nicolasmesa.co/posts/2019/08/booting-your-own-kernel-on-raspberry-pi-via-uart/)
@@ -501,3 +500,124 @@ Each property, after the DT_PROP tag, has a 32-bit value giving an offset from t
 [initramfs buffer format](https://docs.kernel.org/driver-api/early-userspace/buffer-format.html)
 [Flattened Devicetree (DTB) Format](https://devicetree-specification.readthedocs.io/en/stable/flattened-format.html)
 [Device tree everywhere](https://ozlabs.org/~dgibson/papers/dtc-paper.pdf)
+
+## Lab 3 
+The goals of this lab are:
+* Understand what's exception levels in Armv8-A
+* Understanding what's exception handling
+* Understand what's interrupt
+* Understand how RPi3's peripherals interrupt the CPU by interrupt controllers
+* Understand how to multiplex a timer
+* Understand how to concurrently handle I/O devices
+
+#### Exception levels in Armv8-A
+ARM specification defines four priviledge levels that are called Exception Levels and numbered from 0 to 3, where **EL0** is the lowest priviledge level and **EL3** is the highest priviledge level.
+The rough purpose of each EL are as follows:
+* EL3 the highest priviledge level is typically used for so called **Secure Monitor**.
+* EL2 seem to target the virtualization use-case specifically and that's the EL at which hypervisors would normally use for virtualization purposes.
+* EL1 is th level that priviledged parts of the OS kernel use, so for example, Linux Kernel code will run with EL1 priviledges.
+* EL0 is the most unpriviledged level and therefor that's where the most unpriviledged code runs (userspace applications, userspace drivers, etc).
+
+###### Jumping between ELs
+ARM specification is pretty clear that there are only two ways to change the EL:
+* take an exception/interrupt - this may switch CPU from a lower EL to a higher EL.
+* return from an exception/interrupt - this may switch CPU from a higher EL to a lower EL.
+
+ARM has a specific instruction used to return from an interrupt: `eret`. This instruction can be executed even if there was no interrupt. To jump to a lower level  with instruction `eret` we have to prepare all the state that `eret` instruction needs and run the `eret` instruction without an actual interrupt or exception.
+The state required by the `eret` instruction is stored in a few registers. For example, when running on EL2 and executing `eret` instruction takes the address of the instruction to return to from the `ELR_EL2` register and some other state of the processor from `SPSR_EL2` register. Among other things `SPSR_EL2` register contains the EL to which the `eret` instruction should switch the processor to.
+
+###### Switching to EL1
+When RPi starts it runs on EL2 by default and our bootstrap procedure have to jump to EL1 to run our minimal OS on it. Strictly speaking, our OS is not obligued to switch to EL1 but EL1 is a natural choice for us because this level has just the right set of privileges to implement all common OS tasks. Let's take a look at the code that does it:
+```
+  mov x2, (1 << 31)
+  msr hcr_el2, x2
+  mov x2, 0x3c5
+  msr spsr_el2, x2
+  ldr x2, =el1_entry
+  msr elr_el2, x2
+  eret
+```
+
+What this code does:
+1. Set that execution state at EL1 will be AArch64 but not the AArch32 (by setting the bit 31 at **HCR_EL2**, Hypervisor Conficuration Register).
+2. Set the exception level to switch to by writing a constant 0x3c5 into the **SPSR_EL2** (Saved Program State Register). The last four bits define the exception level and selected SP. The value 0b0101 means EL1h, i.e. switch to EL2 usinf dedicated stack pointer, The other bits mask exception and interrupts.
+3. Set the address to which we are going to return after `eret` instruction will be executed. Here the address of the location of `el1_entry` label is written into **ELR_EL2** (Exception Link Register).
+
+
+###### Launch a userprogram
+A userprogram in this context is just binary code which comprise  a sequence of instructions forming execution flow of the program.
+To run the program in our mini OS we need to switch to the exception level EL0 and continue execution from the start point of that program. Before swtching to EL0 we need to allocate stack to it.
+I placed a code to run a user program in dedicated function called `execute_at_el0`. It takes two arguments: the address of program to execute and address of the top of the applications stack.
+```
+execute_in_el0:
+    save_context
+    mov x2, 0x3c0
+    msr spsr_el1, x2
+    msr sp_el0, x1
+    msr elr_el1, x0
+    eret
+```
+
+The code set the target EL with masked exceptions and interrupts, set the address to continue from when the `eret` is finished and set address of stack for the target EL (EL0). Finally, instruction `eret` tells to processor to load saved (prepared by us) state and continue execution from saved address. Just remind that to pass parameters to the function in accordance with AAPCS (Procedure Call Standard for the Arm Architecture) the registers **X0-X7** are used. So the register **X0** contains the first parameter (entrypoint of userprogram) and the register **X1** contains the second parameter (address of applications stack). `save_context` is just a macro which will be explained later.
+
+The program to execute is just a few instructions. The only possible way to return from application level to kernel is to take exception. The program do it with instruction `svc` which is used for system calls.
+```
+.section ".text"
+.globl userprogram
+userprogram:
+    mov x0, 0
+1:
+    add x0, x0, 1
+    svc 0
+    cmp x0, 5
+    blt 1b
+1:
+    b 1b
+```
+At the initial stage (when debugging) I linked this program with kernel and launch it as following:
+```
+#define USER_STACK_SIZE 512
+
+extern void userprogram();
+...
+uint8_t *stack = malloc(USER_STACK_SIZE);
+execute_in_el0(&userprogram, stack);
+...
+```
+Later I link it as a standalone ELF-file, strip the ELF-header (just the same as I prepare the kernel image), copy to the ramdisk and launch the program from it: the function `cpio_exec_file(const char *fname, void *stack)` scans the rootdirectory of ramdisk for the givenfilename, takes the address where the file begins and run it with call `execute_in_el0(pfile, stack);` the `pfile` contains address on ramdisk where the file begins.
+
+To return from the program back to the kernel it is needed to switch exception level and continue execution from the address where the execution flow was interrupted. The userprogram generates synchronous exception with command `svc`. The corresponding handler restore the previous context and execute command `ret' which copy the address of the next command from **LR/X30** into **PC**.
+```
+svc_el0_64:
+    load_context
+    ret
+```
+The handler just restore execution context (saved previously by `save_context` in function `execute_in_el0`) and execute instruction `ret`. Whenever the exception handler usually finished by `eret` instruction, which used to switch from higher exception level to lower one (decreasing privileges). What the `eret` actually does when executing on the level ELx:
+* set PC to the value kept by ELR_ELx
+* set PSTATE to the value kept by SPSR_ELx
+In our case we trap into the handler from lower level (application requested synchronous exception with `svc` instruction) but opposite to usual cases we don't need to return to application. We want to return to the kernel code and continue execution immediatelly after the function `execute_in_el0`. How does it work, step by step:
+1. Kernel code call the function `execute_in_el0', the return address saved in the link register (LR).
+2. The function 'execute_in_el0` save the current execution context (the registers X0-X30) on the stack of the current exception level (EL1). After that the function writes the start address of user program and address of the top of user-stack into special registers and switch to the lower level (EL0) with instruction `eret`. We are not going to return here when the application will finish it's execution.
+3. Application does what it needs to and execute instruction `svc` which requested the synchronous exception. Processor handling this command starts execution the correspoinding handler. Now execution level is EL1 but we need to restore processor state as it was before the switching to application. Because of we are at the level EL1 and its stack wasn't changed we can load the previous state with macro `load_context` and return to kernel with command `ret` because LR now points to the address immediatelly after the call `execute_in_el0`.
+
+It is important to note that we store execution context on the stack of EL1 and therefore have to restore that context when being at the EL1.
+
+-----------------------------------------------------------------
+
+Each ARM processor that supports ARM.v8 architecture has 4 exception levels. We can think about an exception level (or EL for short) as a processor execution mode in which only a subset of all operations and registers are available. The least privileged exception level is level 0, When processor operates at this level, it mostly uses only general purpose registers (X0 - X30) and stack poitner register (SP). EL0 also allows using `STR` and `LDR` commands to load and store data to and from memory and few other instructions commonly used by a user program.
+
+###### changing current exception level
+In ARM architecture there is no way how a program can increase its own exception level without the participation of the software that already runn on a higher level. This makes a perfect sence: otherwise, any program would be able to escape its assigned EL and access other programs data. Current EL can be changed only if and exception is generated. This can happen if a program executes some illegal instruction. Also an application can run `svc` instruction to generate an exception on purpose. Hardware generated interrupts are also handled as a special type of exceptions. Whenever an exceptio is generated the following sequence of steps takes place (assume that the exception is handled ad EL n, where *n* is 1, 2 or 3).
+
+1. Address of the current instruction is saved in the `ELR_ELn` register. (It is called Exception Link register).
+2. Current processor state is stored in `SPSR_ELn` register (Saved Program Status Register).
+3. An exception handler is executed and does whatever job it needs to do.
+4. Exception handler calls `eret` instruction. This instruction restores processor state from `SPSR_ELn` and resumes execution starting from the address, stored in the `ELR_ELn` register.
+
+In practice the process is a little more complicated bacause exception handler also needs to store the state of all general purpose registers and restore it back aftewards.
+Exception handler is not obliged to return to the same location from which the exception originates. Both `ELR_ELn` and `SPSR_ELn` are writable and exception handler can modify them it it wants to.
+
+##### references
+[AArch64 Exception Levels](https://krinkinmu.github.io/2021/01/04/aarch64-exception-levels.html
+[Interrupts](https://s-matyukevich.github.io/raspberry-pi-os/docs/lesson03/rpi-os.html)
+[AArch64-Reference-Manual](https://developer.arm.com/documentation/ddi0487/ca/)

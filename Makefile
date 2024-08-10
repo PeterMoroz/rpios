@@ -11,23 +11,38 @@ all: kernel8.img
 ramdisk:
 	cd rootfs && find . | cpio -o -H newc > ../ramdisk && cd ..
 
+exceptions.o: exceptions.S
+	$(CROSS)gcc $(CFLAGS) -c exceptions.S -o exceptions.o
+
 start.o: start.S
 	$(CROSS)gcc $(CFLAGS) -c start.S -o start.o
 
 utils.o: utils.S
 	$(CROSS)gcc $(CFLAGS) -c utils.S -o utils.o
 
+userprogram.o: userprogram.S
+	$(CROSS)gcc $(CFLAGS) -c userprogram.S -o userprogram.o
+
+userprogram.elf: userprogram.o
+	$(CROSS)ld -nostdlib -nostartfiles userprogram.o -o $@
+
+userprogram: userprogram.elf
+	$(CROSS)objcopy -O binary $< $@
+
 kernel8.img: kernel8.elf
 	$(CROSS)objcopy -O binary $< $@
 
-kernel8.elf: start.o utils.o $(OBJS) kernel.ld
-	$(CROSS)ld -nostdlib -nostartfiles start.o utils.o $(OBJS) -T kernel.ld -o $@
+kernel8.elf: exceptions.o start.o utils.o $(OBJS) kernel.ld
+	$(CROSS)ld -nostdlib -nostartfiles exceptions.o start.o utils.o $(OBJS) -T kernel.ld -o $@
+
+#kernel8.elf: exceptions.o start.o utils.o userprogram.o $(OBJS) kernel.ld
+#	$(CROSS)ld -nostdlib -nostartfiles exceptions.o start.o utils.o userprogram.o $(OBJS) -T kernel.ld -o $@
 
 runqemu: kernel8.img ramdisk
 	qemu-system-aarch64 -M raspi3 -kernel kernel8.img -dtb bcm2710-rpi-3-b-plus.dtb -initrd ramdisk -serial null -serial stdio
 
-dbgqemu: kernel8.img
-	qemu-system-aarch64 -M raspi3 -kernel kernel8.img -dtb bcm2710-rpi-3-b-plus.dtb -display none -S -s
+dbgqemu: kernel8.img ramdisk
+	qemu-system-aarch64 -M raspi3 -kernel kernel8.img -dtb bcm2710-rpi-3-b-plus.dtb -initrd ramdisk -display none -S -s
 
 clean:
-	rm -f *.o *.img *.elf ramdisk
+	rm -f *.o *.img *.elf *.bin ramdisk userprogram

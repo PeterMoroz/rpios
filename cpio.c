@@ -2,6 +2,9 @@
 #include "strutils.h"
 #include "memutils.h"
 
+#include "heap.h"
+#include "utils.h"
+
 struct cpio_newc_header {
 	char c_magic[6];
 	char c_ino[8];
@@ -20,7 +23,7 @@ struct cpio_newc_header {
 };
 
 // The address is specified in config.txt
-// #define INITRD_ADDR 0x2000000
+// #define INITRD_START 0x2000000
 // Default address at which QEMU load ramdisk
 #define INITRD_START 0x8000000
 
@@ -152,6 +155,54 @@ int cpio_read_file(const char *fname, char *rd_buffer, size_t rd_buffer_size)
 		return n;
 	}
 	
+	return -1;
+}
+
+int cpio_exec_file(const char *fname, void *stack)
+{
+	const uint8_t *p = initrd_start != NULL ? initrd_start : (uint8_t *)INITRD_START;
+
+	struct cpio_newc_header hdr;
+
+	char buffer[16];
+	uint32_t fsize = 0;
+	const uint8_t *pfile = NULL;
+	char found = 0;
+	while (1) {
+		memcpy(&hdr, p, sizeof(hdr));
+		uint32_t sz = hex_to_uint32(hdr.c_namesize);
+		p += sizeof(hdr);
+		memset(buffer, 0, sizeof(buffer));
+		memcpy(buffer, p, sz);
+
+		if (strncmp(buffer, "TRAILER!!!", sz - 1) == 0) {
+			break;
+		}
+
+		if (strlen(fname) == (sz - 1) && strncmp(buffer, fname, sz - 1) == 0) {
+			found = 1;
+		}
+
+		p += sz;
+		p = (uint8_t *)(((int64_t)p + (4 - 1)) & -4);
+		sz = hex_to_uint32(hdr.c_filesize);
+		if (found == 1) {
+			fsize = sz;
+			pfile = p;
+			break;
+		}
+		p += sz;
+		p = (uint8_t *)(((int64_t)p + (4 - 1)) & -4);
+	}
+
+	if (found == 1) {
+		//uint8_t *fbuffer = malloc(fsize);
+		//memcpy(fbuffer, pfile, fsize);
+		//execute_in_el0(fbuffer, stack);
+		execute_in_el0(pfile, stack);
+		return 0;
+	}
+
 	return -1;
 }
 
