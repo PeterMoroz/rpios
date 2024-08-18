@@ -11,8 +11,14 @@ all: kernel8.img
 ramdisk:
 	cd rootfs && find . | cpio -o -H newc > ../ramdisk && cd ..
 
+core_timer.o: core_timer.S
+	$(CROSS)gcc $(CFLAGS) -c core_timer.S -o core_timer.o
+
 exceptions.o: exceptions.S
 	$(CROSS)gcc $(CFLAGS) -c exceptions.S -o exceptions.o
+
+interrupts.o: interrupts.S
+	$(CROSS)gcc $(CFLAGS) -c interrupts.S -o interrupts.o
 
 start.o: start.S
 	$(CROSS)gcc $(CFLAGS) -c start.S -o start.o
@@ -32,8 +38,9 @@ userprogram: userprogram.elf
 kernel8.img: kernel8.elf
 	$(CROSS)objcopy -O binary $< $@
 
-kernel8.elf: exceptions.o start.o utils.o $(OBJS) kernel.ld
-	$(CROSS)ld -nostdlib -nostartfiles exceptions.o start.o utils.o $(OBJS) -T kernel.ld -o $@
+kernel8.elf: core_timer.o exceptions.o interrupts.o start.o utils.o $(OBJS) kernel.ld
+	$(CROSS)ld -nostdlib -nostartfiles core_timer.o exceptions.o interrupts.o start.o utils.o $(OBJS) -T kernel.ld -o $@
+	$(CROSS)objdump -D kernel8.elf > kernel8.lst
 
 #kernel8.elf: exceptions.o start.o utils.o userprogram.o $(OBJS) kernel.ld
 #	$(CROSS)ld -nostdlib -nostartfiles exceptions.o start.o utils.o userprogram.o $(OBJS) -T kernel.ld -o $@
@@ -45,4 +52,4 @@ dbgqemu: kernel8.img ramdisk
 	qemu-system-aarch64 -M raspi3 -kernel kernel8.img -dtb bcm2710-rpi-3-b-plus.dtb -initrd ramdisk -display none -S -s
 
 clean:
-	rm -f *.o *.img *.elf *.bin ramdisk userprogram
+	rm -f *.o *.img *.elf *.bin *.lst ramdisk userprogram

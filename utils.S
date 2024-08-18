@@ -1,4 +1,5 @@
 #include "execution_context.inc"
+#include "irq.inc"
 
 .global branch_to_address
 branch_to_address:
@@ -12,7 +13,9 @@ get_el:
 
 .global execute_in_el0
 execute_in_el0:
+    disable_irq
     save_context
+    enable_irq
     mov x2, 0x3c0
     msr spsr_el1, x2
     msr sp_el0, x1

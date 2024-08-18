@@ -6,6 +6,8 @@
 #include "utils.h"
 #include "strutils.h"
 #include "memutils.h"
+#include "interrupts.h"
+#include "core_timer.h"
 
 
 #define PM_PASSWORD 0x5a000000
@@ -298,11 +300,13 @@ void kmain(uint64_t dtb_ptr32)
 	char cmd[32];
 
 	uart_init();
-	// load_kernel();
+	load_kernel();
 	
 	init_exception_table();
 
 	// execute_userprogram();
+	core_timer_init();
+	enable_interrupts();
 
 	print_board_sn();
 	print_board_revision();

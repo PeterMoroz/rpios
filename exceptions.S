@@ -1,19 +1,20 @@
 #include "exception_id.h"
 #include "execution_context.inc"
+#include "irq.inc"
 
 
 .macro exception_handler_stub id
-// TO DO: disable interrupts
+disable_irq
 save_context
-// TO DO: enable interrupts
+# enable_irq
 mov x0, #\id
 mrs x1, spsr_el1
 mrs x2, esr_el1
 mrs x3, elr_el1
 bl print_exception_info
-// TO DO: disable interrupts
+# disable_irq
 load_context
-// TO TO: enable interrupts
+enable_irq
 eret
 .endm
 
@@ -63,7 +64,15 @@ synchronous_el1h:
     exception_handler_stub SYNCHRONOUS_EL1H
 
 irq_el1h:
-    exception_handler_stub IRQ_EL1H
+    // exception_handler_stub IRQ_EL1H
+    disable_irq
+    save_context
+
+    bl handle_irq_el1h
+
+    load_context
+    enable_irq
+    eret
 
 fiq_el1h:
     exception_handler_stub FIQ_EL1H
@@ -77,7 +86,9 @@ synchronous_el0_64:
     lsr x24, x25, #26
     cmp x24, #0x15
     b.eq svc_el0_64
+    disable_irq
     load_context
+    enable_irq
     eret
 
 irq_el0_64:
@@ -103,7 +114,9 @@ serror_el0_32:
 
 
 svc_el0_64:
+    disable_irq
     load_context
+    enable_irq
     ret
 
 .globl init_exception_table
