@@ -3,7 +3,8 @@
 
 .global enable_interrupts
 enable_interrupts:
-  mov x0, 0x2
+  // mov x0, 0x2
+  ldr x0, =((1 << 29) | (1 << 2))
   ldr x1, =INTERRUPT_ENABLE_1
   str x0, [x1]
   mov x0, 0x1
