@@ -15,10 +15,8 @@ core_timer_init:
 
 .global core_timer_irq_handler
 core_timer_irq_handler:
-//  mrs x0, cntp_tval_el0
-//  msr cntp_tval_el0, x0
   mrs x0, cntfrq_el0
-  mov x0, x0, lsl 1
+//  mov x0, x0, lsl 1
   msr cntp_tval_el0, x0
   ret
 
@@ -28,3 +26,11 @@ core_timer_get_seconds:
   mrs x2, cntfrq_el0
   sdiv x0, x1, x2
   ret
+
+.global core_timer_set_delay
+core_timer_set_delay:
+  mrs x1, cntfrq_el0
+  mul x2, x1, x0
+  msr cntp_tval_el0, x2
+  ret
+

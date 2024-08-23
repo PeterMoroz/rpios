@@ -8,6 +8,7 @@
 #include "memutils.h"
 #include "interrupts.h"
 #include "core_timer.h"
+#include "oneshot_timer.h"
 
 
 #define PM_PASSWORD 0x5a000000
@@ -294,6 +295,11 @@ void fdt_node_visit(const uint8_t *node)
 	}
 }
 
+void on_timer(void* arg)
+{
+	// do nothing
+}
+
 void kmain(uint64_t dtb_ptr32)
 {
 	int rst = 0;
@@ -311,8 +317,12 @@ void kmain(uint64_t dtb_ptr32)
 	print_board_sn();
 	print_board_revision();
 
-	fdt_parse((const uint8_t *)dtb_ptr32, fdt_node_visit);
+	add_timer(&on_timer, NULL, 2);
+	add_timer(&on_timer, NULL, 4);
+	add_timer(&on_timer, NULL, 3);
+	add_timer(&on_timer, NULL, 8);
 
+	fdt_parse((const uint8_t *)dtb_ptr32, fdt_node_visit);
 
 	while (1) {
 		uart_putc('>');
