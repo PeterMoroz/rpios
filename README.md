@@ -676,21 +676,45 @@ Once the timer condition is reached, the timer will continue to signal an interr
 
 The function `core_timer_irq_handler()` just write the timer frequency value into the timer register so clearing the current interrupt and set the 1s delay.
 
+#### Peripheral Interrupt
+Will consider interrupts from mini UART as an example of peripheral interrupts. For now we are using polling mode to communicate with UART peripherral, i.e. to send/receive character it is needed to check state of transmitter/receiver FIFO by reading the data status register (0x3F215054). It might be not well in some cases because CPU core wasting time in a busy loop. The alternative approach would be using interrupts. The mini UART peripheral could generate interrupts when:
+* receiver FIFO has at least one character
+* transmitter FIFO has at leas one slot
 
------------------------------------------------------------------
+Both of these interrupts could be configured independently.
+To enable receiver/transmitter interrupts it is needed to set bits corresponding bits (bit 0 to enable receiver interrupts, bit 1 to enable transmitter interrupts) in the interrupt enable register (0x3F215044) of mini UART. The interrupt handler should read the mini UART interrupt status register (0x3F215048) to verify that source of pending IRQ is mini UART and get reason of this interrupt. The relevant bits:
+* bit 0 is clear when interrupt pending
+* bits 2:1 contain the interrupt ID: 00 - no interrups, 01 - transmitter buffer empty, 10 - receiver has a byte
 
-Each ARM processor that supports ARM.v8 architecture has 4 exception levels. We can think about an exception level (or EL for short) as a processor execution mode in which only a subset of all operations and registers are available. The least privileged exception level is level 0, When processor operates at this level, it mostly uses only general purpose registers (X0 - X30) and stack poitner register (SP). EL0 also allows using `STR` and `LDR` commands to load and store data to and from memory and few other instructions commonly used by a user program.
+##### Circular buffer
+Interrupts are asynchronous events to the program (mini kernel in our case) which uses UART to communication with external world. It means that we need to keep somewhere the received bytes until kernel will need them, the same related to bytes pending to send - they should be kept somewhere until UART will notify our kernel that transmitter FIFO of mini UART has some space. A commonly known solution to this problem is using circular buffer (ring buffer). The same as UART has two hardware FIFO, our UART driver need two software buffers - one to keep received characters, another one - to store characters pending to send.
 
-###### changing current exception level
-In ARM architecture there is no way how a program can increase its own exception level without the participation of the software that already runn on a higher level. This makes a perfect sence: otherwise, any program would be able to escape its assigned EL and access other programs data. Current EL can be changed only if and exception is generated. This can happen if a program executes some illegal instruction. Also an application can run `svc` instruction to generate an exception on purpose. Hardware generated interrupts are also handled as a special type of exceptions. Whenever an exceptio is generated the following sequence of steps takes place (assume that the exception is handled ad EL n, where *n* is 1, 2 or 3).
+##### Interrupt handler
+When interrupt handler processing an interrupt from mini UART it should distinguish was it an interrupt from receiver or interrupt from transmitter. When transmitter raise interrupt, the processing code take a symbol from driver's buffer and write it into data register of mini UART. When receiver raise interrupt, the processing code read a symbol from data register and put it into driver's buffer.
 
-1. Address of the current instruction is saved in the `ELR_ELn` register. (It is called Exception Link register).
-2. Current processor state is stored in `SPSR_ELn` register (Saved Program Status Register).
-3. An exception handler is executed and does whatever job it needs to do.
-4. Exception handler calls `eret` instruction. This instruction restores processor state from `SPSR_ELn` and resumes execution starting from the address, stored in the `ELR_ELn` register.
+  ------------------------
+  | mini UART peripheral |
+  ------------------------
+  |                      |                  -------------------------
+  |   -------------      |                  |      UART driver      |
+  |   |  Rx FIFO  |      |                  -------------------------
+  |   -------------      |                  |                       |
+  |        |             |                  |        -------------  |
+  |        v             |                  |  ----->| Rx buffer |  |
+  |   -----------------  |  irq processing  |  |     -------------  |
+  |   | Data Register |-------------------------                    |
+  |   |               |<------------------------                    |
+  |   -----------------  |                  |  |     -------------  |
+  |        |             |                  |  ------| Tx buffer |  |
+  |        v             |                  |        -------------  |
+  |   -------------      |                  |                       |
+  |   |  Tx FIFO  |      |                  -------------------------
+  |   -------------      |
+  |                      |
+  ------------------------
 
-In practice the process is a little more complicated bacause exception handler also needs to store the state of all general purpose registers and restore it back aftewards.
-Exception handler is not obliged to return to the same location from which the exception originates. Both `ELR_ELn` and `SPSR_ELn` are writable and exception handler can modify them it it wants to.
+The interrupts in RPI are level-based, it means that interrupt request will remain active untill some actions was not done. When processing interrupts from UART, the reading or writing of the data register (depending on the source of interrupt - either receiver or transmitter) will clear interrupt request. This peculiarity brought me a trouble. I found that UART generates interrupts continuously because the transmitter buffer is empty, but I have no data to send in driver's buffer and my kernel got stuck in repeatedly processing of irq request from UART transmitter. I've not fiund a solution yet and returned to the polling mode.
+
 
 ##### references
 [AArch64 Exception Levels](https://krinkinmu.github.io/2021/01/04/aarch64-exception-levels.html

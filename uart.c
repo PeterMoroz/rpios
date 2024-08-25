@@ -29,8 +29,7 @@ void uart_init()
 	*AUX_MU_CNTL = 0;
 	*AUX_MU_LCR = 3;
 	*AUX_MU_MCR = 0;
-	*AUX_MU_IER = 0;
-	// *AUX_MU_IER = 0xF;
+	*AUX_MU_IER = 0; /* to enable interrupts  *AUX_MU_IER = 0x3; */
 	*AUX_MU_IIR = 6;
 	*AUX_MU_BAUD = 270;
 	r = *GPFSEL1;
@@ -51,6 +50,9 @@ void uart_putc(char c)
 {
 	do { asm volatile("nop"); } while (!(*AUX_MU_LSR & 0x20));
 	*AUX_MU_IO = c;
+	/*
+	uart_putc_async(c);
+	*/
 }
 
 char uart_getc()
@@ -59,6 +61,9 @@ char uart_getc()
 	do { asm volatile("nop"); } while(!(*AUX_MU_LSR & 0x01));
 	r = (char)(*AUX_MU_IO);
 	return r;
+	/*
+	return uart_getc_async();
+	*/
 }
 
 void uart_puts(const char *s)
@@ -92,13 +97,13 @@ void uart_put_uint64_hex(uint64_t x)
 	}
 }
 
-void uart_read_rx_fifo()
+void uart_handle_rx_irq()
 {
 	char c = (char)(*AUX_MU_IO);
 	ring_buffer_put(&rx_buffer, c);
 }
 
-void uart_write_tx_fifo()
+void uart_handle_tx_irq()
 {
 	char c;
 	if (ring_buffer_get(&tx_buffer, &c))
@@ -107,14 +112,14 @@ void uart_write_tx_fifo()
 
 void uart_putc_async(char c)
 {
-	if (!ring_buffer_is_full(&tx_buffer))
-		ring_buffer_put(&tx_buffer, c);
+	ring_buffer_put(&tx_buffer, c);
 }
 
 char uart_getc_async()
 {
 	char c = ' ';
-	ring_buffer_get(&rx_buffer, &c);
+	if (ring_buffer_get(&rx_buffer, &c) == 0)
+		return 0xFF;
 	return c;
 }
 

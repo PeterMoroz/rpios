@@ -29,10 +29,10 @@ void handle_irq_el1h()
 		oneshot_timer_tick();
 	} else if (core0_irq_source & 0x100) {
 		uint32_t aux_irq_status = *AUX_MU_IIR;
-		if (aux_irq_status & 0x2) {
-			uart_write_tx_fifo();
-		} else if (aux_irq_status & 0x4) {
-			uart_read_rx_fifo();
+		if ((aux_irq_status & 0x6) == 0x2) {
+			uart_handle_tx_irq();
+		} else if ((aux_irq_status & 0x6) == 0x4) {
+			uart_handle_rx_irq();
 		}
 	}
 }
