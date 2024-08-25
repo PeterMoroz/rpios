@@ -518,7 +518,7 @@ The rough purpose of each EL are as follows:
 * EL1 is th level that priviledged parts of the OS kernel use, so for example, Linux Kernel code will run with EL1 priviledges.
 * EL0 is the most unpriviledged level and therefor that's where the most unpriviledged code runs (userspace applications, userspace drivers, etc).
 
-###### Jumping between ELs
+##### Jumping between ELs
 ARM specification is pretty clear that there are only two ways to change the EL:
 * take an exception/interrupt - this may switch CPU from a lower EL to a higher EL.
 * return from an exception/interrupt - this may switch CPU from a higher EL to a lower EL.
@@ -526,7 +526,7 @@ ARM specification is pretty clear that there are only two ways to change the EL:
 ARM has a specific instruction used to return from an interrupt: `eret`. This instruction can be executed even if there was no interrupt. To jump to a lower level  with instruction `eret` we have to prepare all the state that `eret` instruction needs and run the `eret` instruction without an actual interrupt or exception.
 The state required by the `eret` instruction is stored in a few registers. For example, when running on EL2 and executing `eret` instruction takes the address of the instruction to return to from the `ELR_EL2` register and some other state of the processor from `SPSR_EL2` register. Among other things `SPSR_EL2` register contains the EL to which the `eret` instruction should switch the processor to.
 
-###### Switching to EL1
+##### Switching to EL1
 When RPi starts it runs on EL2 by default and our bootstrap procedure have to jump to EL1 to run our minimal OS on it. Strictly speaking, our OS is not obligued to switch to EL1 but EL1 is a natural choice for us because this level has just the right set of privileges to implement all common OS tasks. Let's take a look at the code that does it:
 ```
   mov x2, (1 << 31)
@@ -544,7 +544,7 @@ What this code does:
 3. Set the address to which we are going to return after `eret` instruction will be executed. Here the address of the location of `el1_entry` label is written into **ELR_EL2** (Exception Link Register).
 
 
-###### Launch a userprogram
+##### Launch a userprogram
 A userprogram in this context is just binary code which comprise  a sequence of instructions forming execution flow of the program.
 To run the program in our mini OS we need to switch to the exception level EL0 and continue execution from the start point of that program. Before swtching to EL0 we need to allocate stack to it.
 I placed a code to run a user program in dedicated function called `execute_at_el0`. It takes two arguments: the address of program to execute and address of the top of the applications stack.
@@ -601,6 +601,81 @@ In our case we trap into the handler from lower level (application requested syn
 3. Application does what it needs to and execute instruction `svc` which requested the synchronous exception. Processor handling this command starts execution the correspoinding handler. Now execution level is EL1 but we need to restore processor state as it was before the switching to application. Because of we are at the level EL1 and its stack wasn't changed we can load the previous state with macro `load_context` and return to kernel with command `ret` because LR now points to the address immediatelly after the call `execute_in_el0`.
 
 It is important to note that we store execution context on the stack of EL1 and therefore have to restore that context when being at the EL1.
+
+#### Core Timer
+ARMv8 has an architecture-defined per-core timers which are part of a Generic Timer.
+
+
+                  --------------------
+                  |  System counter  |
+                  --------------------
+                           |
+                           | System Timer Bus
+                           |
+                           v
+               -------------------------
+               |                       |
+               v                       v
+          -----------             -----------    Private Peripheral Interrupt
+       ---|  Timer  |             |  Timer  |---
+       |  -----------             -----------  |
+       |  -----------             -----------  |
+       |  |         |             |         |  |
+       |  |   PE    |             |   PE    |  |
+       |  |         |             |         |  |
+       |  -----------             -----------  |
+       |                                       |
+       |      --------------------------       |
+       ------>|  Interrupt Controller  |<-------
+              --------------------------
+
+The System Counter is an always-on device, which provides a fixed-frequency incrementing system counter. The system count value is broadcast to all the cores in the system. Each core has a set of timers. These timers are comparators, which compare against the broadcast system count that is provided by System Counter. These timers could be configured to generate interrupts in set points in the future.
+The `CNTPCT_EL0` system register reports the current system timer value. The `CNTFRQ_EL0` contains the frequency of the system count, the register is writable.
+
+##### Timer registers
+* CNTP_CTL_EL0 - control register
+* CNTP_CVAL_EL0 - comparator value
+* CNTP_TVAL_EL0 - timer value
+
+##### Configuring a timer
+To setup timer to trigger an interrupt we need to set bit 0 (ENABLE) and clear bit 1 (IMASK) of the control register.
+Timer triggers when the count reaches or exceeds the value written in comparator register, i.e. the condition is met:
+`CVAL <= System Count`
+
+The comparator register could be populated either by directly writting the valueto compare into comparator register or writing the value of delay into timer register. In the latter case the comparator register will be populated by the value `CVAL = TVAL + System Count`.
+
+
+The code to initialize the core timer (at core 0) and setup the next event will trigger in one second is  below:
+```
+.global core_timer_init
+core_timer_init:
+  mov x0, 0x1
+  msr cntp_ctl_el0, x0
+  mrs x0, cntfrq_el0
+  msr cntp_tval_el0, x0
+  mov x0, 0x2
+  ldr x1, =0x40000040
+  str x0, [x1]
+  ret
+```
+
+Setting the bit 1 in the register at address 0x40000040 (Core 0 Timers interrupt control) will enable the interrupts from nonsecure physical timer on core 0. To identify that interrupt need to test the corresponding bit in the register at address 0x40000060 (Core 0 interrupt source). The fragment of IRQ handling code:
+```
+#define CORE0_IRQ_SOURCE ((volatile uint32_t *)0x40000060)
+...
+»       uint32_t core0_irq_source = *CORE0_IRQ_SOURCE;
+»       if (core0_irq_source & 0x2) {
+»       »       core_timer_irq_handler();
+»       }
+```
+
+Once the timer condition is reached, the timer will continue to signal an interrupt until either one of these:
+* IMASK bit is set, which masks the interrupt
+* ENABLE bit is cleared, which disables the timer
+* TVAL or CVAL is written, so that firing condition is no longer met
+
+The function `core_timer_irq_handler()` just write the timer frequency value into the timer register so clearing the current interrupt and set the 1s delay.
+
 
 -----------------------------------------------------------------
 
