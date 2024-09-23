@@ -9,6 +9,7 @@
 #include "interrupts.h"
 #include "core_timer.h"
 #include "oneshot_timer.h"
+#include "printf.h"
 
 
 #define PM_PASSWORD 0x5a000000
@@ -316,6 +317,15 @@ void kmain(uint64_t dtb_ptr32)
 
 	print_board_sn();
 	print_board_revision();
+
+	/*
+	printf("printf: print text without arguments\r\n");
+	printf("printf: print text with percentage characters %% %% \r\n");
+	printf("printf: print text string %s %s \r\n", "hello", "world");
+	printf("printf: print 32-bit numbers %x %x \r\n", 0x01234567, 0x89ABCDEF);
+	// TO DO: fix - 64-bit integers are truncated
+	printf("printf: print 64-bit numbers %x %x \r\n", 0x01234567ABCDEF, 0xFEDCBA9876543210);
+*/
 
 	add_timer(&on_timer, NULL, 2);
 	add_timer(&on_timer, NULL, 4);
