@@ -10,6 +10,7 @@
 #include "core_timer.h"
 #include "oneshot_timer.h"
 #include "printf.h"
+#include "allocator.h"
 
 
 #define PM_PASSWORD 0x5a000000
@@ -301,13 +302,122 @@ void on_timer(void* arg)
 	// do nothing
 }
 
+void test_formated_print()
+{
+	printf("printf: print text without arguments\r\n");
+	printf("printf: print text with percentage characters %% %% \r\n");
+	printf("printf: print text string %s %s \r\n", "hello", "world");
+	printf("printf: print 32-bit numbers %x %x \r\n", 0x01234567, 0x89ABCDEF);
+	// TO DO: fix - 64-bit integers are truncated
+	printf("printf: print 64-bit numbers %x %x \r\n", 0x01234567ABCDEF, 0xFEDCBA9876543210);
+}
+
+void test_and_trace_allocator()
+{
+	void *p1 = NULL, *p2 = NULL, *p3 = NULL, *p4 = NULL, *p5 = NULL, *p6 = NULL, *p7 = NULL, *p8 = NULL;
+
+	//printf(" -- allocate block 32K \n");
+	//void* p = allocate(32 * 1024);
+	//printf(" -- release allocated block \n");
+	//release(p);
+	//printf(" ---------------------- \n");
+
+	//printf(" -- allocate 2 block of 16K \n");
+	//p1 = allocate(16 * 1024);
+	//p2 = allocate(16 * 1024);
+	//printf(" -- release allocated blocks \n)";
+	//release(p2);
+	//release(p1);
+	//printf(" ---------------------- \n");
+
+	//printf(" -- allocate 4 block of 8K \n");
+	//p1 = allocate(8 * 1024);
+	//p2 = allocate(8 * 1024);
+	//p3 = allocate(8 * 1024);
+	//p4 = allocate(8 * 1024);
+	//printf(" -- release allocated blocks \n");
+	//release(p4);
+	//release(p3);
+	//release(p2);
+	//release(p1);
+	//printf(" ---------------------- \n");
+
+	//printf(" -- allocate 8 block of 4K \n");
+	//p1 = allocate(4 * 1024);
+	//p2 = allocate(4 * 1024);
+	//p3 = allocate(4 * 1024);
+	//p4 = allocate(4 * 1024);
+
+	//p5 = allocate(4 * 1024);
+	//p6 = allocate(4 * 1024);
+	//p7 = allocate(4 * 1024);
+	//p8 = allocate(4 * 1024);
+	//printf(" -- release allocated blocks \n");
+	//release(p8);
+	//release(p7);
+	//release(p6);
+	//release(p5);
+	//release(p4);
+	//release(p3);
+	//release(p2);
+	//release(p1);
+	//printf(" ---------------------- \n");
+
+	printf(" -- allocate 1 block of 16K and 2 blocks of 8K \n");
+	p1 = allocate(16 * 1024);
+	p2 = allocate(8 * 1024);
+	p3 = allocate(8 * 1024);
+	printf(" -- release allocated blocks \n");
+	release(p1);
+	release(p2);
+	release(p3);
+	printf(" ---------------------- \n");
+
+	printf(" -- allocate 2 block of 8K and 4 blocks of 4K \n");
+	p1 = allocate(8 * 1024);
+	p2 = allocate(8 * 1024);
+	p3 = allocate(4 * 1024);
+	p4 = allocate(4 * 1024);
+	p5 = allocate(4 * 1024);
+	p6 = allocate(4 * 1024);
+	printf(" -- release allocated blocks \n");
+	release(p1);
+	release(p2);
+	release(p3);
+	release(p4);
+	release(p5);
+	release(p6);
+	printf(" ---------------------- \n");
+
+	printf(" -- allocate 8 block of 4K \n");
+	p1 = allocate(4 * 1024);
+	p2 = allocate(4 * 1024);
+	p3 = allocate(4 * 1024);
+	p4 = allocate(4 * 1024);
+
+	p5 = allocate(4 * 1024);
+	p6 = allocate(4 * 1024);
+	p7 = allocate(4 * 1024);
+	p8 = allocate(4 * 1024);
+	printf(" -- release allocated blocks \n");
+	release(p1);
+	release(p2);
+	release(p3);
+	release(p4);
+	release(p5);
+	release(p6);
+	release(p7);
+	release(p8);
+	printf(" ---------------------- \n");
+}
+
 void kmain(uint64_t dtb_ptr32)
 {
 	int rst = 0;
 	char cmd[32];
 
 	uart_init();
-	load_kernel();
+  load_kernel();
 	
 	init_exception_table();
 
@@ -318,14 +428,14 @@ void kmain(uint64_t dtb_ptr32)
 	print_board_sn();
 	print_board_revision();
 
-	/*
-	printf("printf: print text without arguments\r\n");
-	printf("printf: print text with percentage characters %% %% \r\n");
-	printf("printf: print text string %s %s \r\n", "hello", "world");
-	printf("printf: print 32-bit numbers %x %x \r\n", 0x01234567, 0x89ABCDEF);
-	// TO DO: fix - 64-bit integers are truncated
-	printf("printf: print 64-bit numbers %x %x \r\n", 0x01234567ABCDEF, 0xFEDCBA9876543210);
-*/
+	// char* p = malloc(0);
+	// printf("heap start adress: %x\n", (intptr_t)p);
+	// printf("fdt start address: %x\n", (uint32_t)dtb_ptr32);
+
+	allocator_init();
+
+	test_and_trace_allocator();
+
 
 	add_timer(&on_timer, NULL, 2);
 	add_timer(&on_timer, NULL, 4);
