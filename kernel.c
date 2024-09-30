@@ -11,6 +11,7 @@
 #include "oneshot_timer.h"
 #include "printf.h"
 #include "allocator.h"
+#include "pool_allocator.h"
 
 
 #define PM_PASSWORD 0x5a000000
@@ -411,13 +412,40 @@ void test_and_trace_allocator()
 	printf(" ---------------------- \n");
 }
 
+void allocate_blocks(size_t block_size)
+{
+	printf("allocate blocks of %x bytes: ", block_size);
+	size_t block_count = 0;
+	while (1) {
+		void* p = pool_allocator_alloc(block_size);
+		if (!p)
+			break;
+		block_count++;
+	}
+	printf(" allocated %x blocks\n", block_count);
+}
+
+void test_pool_allocator()
+{
+	printf("test pool allocator\n");
+
+	allocate_blocks(1024);
+	allocate_blocks(512);
+	allocate_blocks(256);
+	allocate_blocks(128);
+	allocate_blocks(64);
+	allocate_blocks(32);
+	allocate_blocks(16);
+	allocate_blocks(8);
+}
+
 void kmain(uint64_t dtb_ptr32)
 {
 	int rst = 0;
 	char cmd[32];
 
 	uart_init();
-  load_kernel();
+	load_kernel();
 	
 	init_exception_table();
 
@@ -433,9 +461,10 @@ void kmain(uint64_t dtb_ptr32)
 	// printf("fdt start address: %x\n", (uint32_t)dtb_ptr32);
 
 	allocator_init();
+	pool_allocator_init();
 
 	test_and_trace_allocator();
-
+	test_pool_allocator();
 
 	add_timer(&on_timer, NULL, 2);
 	add_timer(&on_timer, NULL, 4);
