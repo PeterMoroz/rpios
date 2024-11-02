@@ -17,8 +17,9 @@
 #define PAGE_BIT_SHIFT 12
 #define PAGE_SIZE (1 << PAGE_BIT_SHIFT)
 
-#define MAX_ORDER 3
-#define ALLOCABLE_SIZE (32 * 1024)
+#define MAX_ORDER 5
+#define ALLOCABLE_SIZE (PAGE_SIZE * (1 << MAX_ORDER))
+
 
 #define BASE_ADDRESS 0x10000000
 
@@ -39,7 +40,8 @@ void allocator_init()
 	}
 	
 #ifdef _TRACE_PRINT_
-	printf("init allocator\t NITEMS: %x  base: %x \n", NITEMS, BASE_ADDRESS);
+	printf("init allocator\t NITEMS: %x  base: %x  ALLOCABLE_SIZE: %x\n", 
+	       NITEMS, BASE_ADDRESS, ALLOCABLE_SIZE);
 	print_array();	
 #endif	
 }
@@ -64,6 +66,9 @@ static void* allocate_frames(size_t size)
 			}
 		}
 	}
+
+	if (idx == -1)
+		return NULL;
 
 	int buddy_idx = idx ^ (1 << frame_array[idx]);
 #ifdef _TRACE_PRINT_
