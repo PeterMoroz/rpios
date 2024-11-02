@@ -78,7 +78,7 @@ void oneshot_timer_tick()
 		oneshot_timer* timer = &timers[i];
 		if (timer->start + timer->delay == now) {
 			timer->callback(timer->data);
-			print_timer_event(timer);
+			// print_timer_event(timer);
 			remove_timer(i);
 			continue;
 		}

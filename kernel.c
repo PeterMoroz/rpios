@@ -463,8 +463,8 @@ void kmain(uint64_t dtb_ptr32)
 	allocator_init();
 	pool_allocator_init();
 
-	test_and_trace_allocator();
-	test_pool_allocator();
+	// test_and_trace_allocator();
+	// test_pool_allocator();
 
 	add_timer(&on_timer, NULL, 2);
 	add_timer(&on_timer, NULL, 4);

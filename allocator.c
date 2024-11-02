@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define _TRACE_PRINT_
+// #define _TRACE_PRINT_
 
 #ifdef _TRACE_PRINT_
 #include "printf.h"
@@ -65,8 +65,8 @@ static void* allocate_frames(size_t size)
 		}
 	}
 
-#ifdef _TRACE_PRINT_
 	int buddy_idx = idx ^ (1 << frame_array[idx]);
+#ifdef _TRACE_PRINT_
 	printf("index: %x buddy_index: %x\n", idx, buddy_idx);
 #endif
 
