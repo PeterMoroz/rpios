@@ -11,6 +11,12 @@ get_el:
     lsr x0, x0, #2
     ret
 
+.global delay
+delay:
+    subs x0, x0, #1
+    bne delay
+    ret
+
 .global execute_in_el0
 execute_in_el0:
     disable_irq

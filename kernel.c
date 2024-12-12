@@ -12,6 +12,7 @@
 #include "printf.h"
 #include "allocator.h"
 #include "pool_allocator.h"
+#include "thread.h"
 
 
 #define PM_PASSWORD 0x5a000000
@@ -439,6 +440,71 @@ void test_pool_allocator()
 	allocate_blocks(8);
 }
 
+#define NPAGES 32
+void test_allocator()
+{
+	void* pages[NPAGES] = { NULL };
+	for (int i = 0; i < NPAGES; i++) {
+		printf("1st: allocate page #%x\n", i);
+		pages[i] = allocate(4096);
+		if (pages[i] == NULL) {
+			printf("1st: could not allocate page #%x!\n", i);
+			while (1) ;
+		}
+	}
+
+	void* p = allocate(4096);
+	if (p != NULL) {
+		printf("1st: the page must not be allocated !\n");
+		while (1) ;
+	}
+
+	for (int i = 0; i < NPAGES; i++) {
+		release(pages[i]);
+		pages[i] = NULL;
+	}
+
+	for (int i = 0; i < NPAGES; i++) {
+		printf("2nd: allocate page #%x\n", i);
+		pages[i] = allocate(4096);
+		if (pages[i] == NULL) {
+			printf("2nd: could not allocate page #%x!\n", i);
+			while (1) ;
+		}
+	}
+
+	if (p != NULL) {
+		printf("2nd: the page must not be allocated !\n");
+		while (1) ;
+	}
+	
+	for (int i = 0; i < NPAGES; i++) {
+		release(pages[i]);
+		pages[i] = NULL;
+	}
+}
+
+void foo(void *arg) {
+	/*
+	while (1) {
+		uint8_t id = current_thread_id();
+		printf("Thread (id: %x)\n", id);
+		delay(1000000);
+	}
+	*/
+	
+	for (int i = 0; i < 10; i++) {
+		uint8_t id = current_thread_id();
+		printf("Thread (id: %x) %x\n", id, i);
+		delay(1000000);
+		// schedule();
+	}
+
+	uint8_t id = current_thread_id();
+	printf("Thread (id: %x) finished\n", id);
+}
+
+
 void kmain(uint64_t dtb_ptr32)
 {
 	int rst = 0;
@@ -461,18 +527,27 @@ void kmain(uint64_t dtb_ptr32)
 	// printf("fdt start address: %x\n", (uint32_t)dtb_ptr32);
 
 	allocator_init();
-	pool_allocator_init();
+	// pool_allocator_init();
 
-	// test_and_trace_allocator();
-	// test_pool_allocator();
+	// test_allocator();
 
+	/*
 	add_timer(&on_timer, NULL, 2);
 	add_timer(&on_timer, NULL, 4);
 	add_timer(&on_timer, NULL, 3);
 	add_timer(&on_timer, NULL, 8);
+	*/
 
 	fdt_parse((const uint8_t *)dtb_ptr32, fdt_node_visit);
 
+	for (int i = 0; i < 8; i++) {
+		printf("create thread %x\n", i);
+		thread_create(&foo, i);
+	}
+
+	idle();
+
+	/*
 	while (1) {
 		uart_putc('>');
 		uart_putc(' ');
@@ -516,5 +591,6 @@ void kmain(uint64_t dtb_ptr32)
 			uart_puts("unknown command\n");
 		}
 	}
+	*/
 }
 

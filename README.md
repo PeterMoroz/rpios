@@ -716,7 +716,30 @@ When interrupt handler processing an interrupt from mini UART it should distingu
 The interrupts in RPI are level-based, it means that interrupt request will remain active untill some actions was not done. When processing interrupts from UART, the reading or writing of the data register (depending on the source of interrupt - either receiver or transmitter) will clear interrupt request. This peculiarity brought me a trouble. I found that UART generates interrupts continuously because the transmitter buffer is empty, but I have no data to send in driver's buffer and my kernel got stuck in repeatedly processing of irq request from UART transmitter. I've not fiund a solution yet and returned to the polling mode.
 
 
+
+
 ##### references
 [AArch64 Exception Levels](https://krinkinmu.github.io/2021/01/04/aarch64-exception-levels.html
 [Interrupts](https://s-matyukevich.github.io/raspberry-pi-os/docs/lesson03/rpi-os.html)
 [AArch64-Reference-Manual](https://developer.arm.com/documentation/ddi0487/ca/)
+
+
+## Lab 5
+The goals of this lab are:
+* Understand how to create threads and user processes
+* Understand how to implement scheduler and context switch
+* Understand what is preemption
+
+*Thread* is a task which can be run on single core of CPU. The current state of thread is called *thread context*. Thread context is determined  by the values of CPU register's set.
+One of the main purpose of any OS is to ensure sharing CPU between several threads. By sharing of CPU I mean distribution the CPU's time by allocating time slots at each of them some thread is able to run on CPU. When thread run out alloted time slot OS save context of this thread, choose another thread to execute, load its context and run it. The save/load of context is called *context switching* and choosing the next thread to execute is called *scheduling*.
+
+When  speaking about thread from programming point ow view, it is a function which defines execution flow of thread. To manage threads os  need some kind of list of data structures which associated with these threads and keep the current state of thread. Therefore when creating a new thread it is needed:
+* allocate and initialize thread's context structure
+* assign a function which will be executed by this thread
+* allocate a stack space for thread function
+* put thread's context structure into OS' list for managing
+
+
+
+##### references
+[Scheduler](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/docs/lesson04/rpi-os.md)
