@@ -24,6 +24,9 @@ const char *descriptions[] =
 	"IRQ_EL0_32",
 	"FIQ_EL0_32",
 	"SERROR_EL0_32",
+
+	"error when handle svc (64-bit)",
+	"syscall error",
 };
 
 void print_exception_info(uint32_t id, uint64_t spsr, uint64_t esr, uint64_t elr)
@@ -36,6 +39,23 @@ void print_exception_info(uint32_t id, uint64_t spsr, uint64_t esr, uint64_t elr
 	uart_put_uint64_hex(esr);
 	uart_puts(" ELR: ");
 	uart_put_uint64_hex(elr);
+	uart_puts(" ---- \r\n");
+}
+
+void print_exception_info2(uint32_t id, uint64_t spsr, uint64_t esr, uint64_t elr, uint64_t r24, uint64_t r25)
+{
+	uart_puts("exception: ");
+	uart_puts(descriptions[id]);
+	uart_puts(" SPSR: ");
+	uart_put_uint64_hex(spsr);
+	uart_puts(" ESR: ");
+	uart_put_uint64_hex(esr);
+	uart_puts(" ELR: ");
+	uart_put_uint64_hex(elr);
+	uart_puts(" x24: ");
+	uart_put_uint64_hex(r24);
+	uart_puts(" x25: ");
+	uart_put_uint64_hex(r25);
 	uart_puts(" ---- \r\n");
 }
 

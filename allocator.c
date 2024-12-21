@@ -6,7 +6,7 @@
 // #define _TRACE_PRINT_
 
 #ifdef _TRACE_PRINT_
-#include "printf.h"
+#include "kprintf.h"
 #endif
 
 
@@ -40,7 +40,7 @@ void allocator_init()
 	}
 	
 #ifdef _TRACE_PRINT_
-	printf("init allocator\t NITEMS: %x  base: %x  ALLOCABLE_SIZE: %x\n", 
+	kprintf("init allocator\t NITEMS: %x  base: %x  ALLOCABLE_SIZE: %x\n", 
 	       NITEMS, BASE_ADDRESS, ALLOCABLE_SIZE);
 	print_array();	
 #endif	
@@ -49,7 +49,7 @@ void allocator_init()
 static void* allocate_frames(size_t size)
 {
 #ifdef _TRACE_PRINT_
-	printf("allocate block of %x bytes\n", size);
+	kprintf("allocate block of %x bytes\n", size);
 #endif
 	
 	// find the minimal suitable block
@@ -72,7 +72,7 @@ static void* allocate_frames(size_t size)
 
 	int buddy_idx = idx ^ (1 << frame_array[idx]);
 #ifdef _TRACE_PRINT_
-	printf("index: %x buddy_index: %x\n", idx, buddy_idx);
+	kprintf("index: %x buddy_index: %x\n", idx, buddy_idx);
 #endif
 
 	uint16_t order = frame_array[idx];
@@ -126,7 +126,7 @@ void release(void* p)
 {
   int idx = ((intptr_t)((char *)p - BASE_ADDRESS)) >> PAGE_BIT_SHIFT;
 #ifdef _TRACE_PRINT_
-	printf("release block at %x\n", idx);
+	kprintf("release block at %x\n", idx);
 #endif
 
 	// block of order 0, just mark it as free
@@ -153,11 +153,11 @@ void release(void* p)
 #ifdef _TRACE_PRINT_
 void print_array()
 {
-	printf("frames array: ");
+	kprintf("frames array: ");
 	for (int i = 0; i < NITEMS; i++) {
-	  printf("%x ", frame_array[i]);
+	  kprintf("%x ", frame_array[i]);
 	}
-	printf("\n");
+	kprintf("\n");
 }
 #endif
 

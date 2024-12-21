@@ -21,5 +21,8 @@
 #define FIQ_EL0_32         14
 #define SERROR_EL0_32      15
 
+#define SYNC_EL0_64_ERROR  16
+#define SYSCALL_ERROR      17
+
 #endif
 

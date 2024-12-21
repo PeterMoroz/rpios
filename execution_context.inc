@@ -1,5 +1,5 @@
 
-.macro save_context
+.macro save_context el
 sub sp, sp, 32 * 8
 stp x0, x1, [sp, #16 * 0]
 stp x2, x3, [sp, #16 * 1]

@@ -23,6 +23,9 @@ interrupts.o: interrupts.S
 start.o: start.S
 	$(CROSS)gcc $(CFLAGS) -c start.S -o start.o
 
+syscall.o: syscall.S
+	$(CROSS)gcc $(CFLAGS) -c syscall.S -o syscall.o
+
 thread_utils.o: thread_utils.S
 	$(CROSS)gcc $(CFLAGS) -c thread_utils.S -o thread_utils.o
 
@@ -41,12 +44,9 @@ userprogram: userprogram.elf
 kernel8.img: kernel8.elf
 	$(CROSS)objcopy -O binary $< $@
 
-kernel8.elf: core_timer.o exceptions.o interrupts.o start.o thread_utils.o utils.o $(OBJS) kernel.ld
-	$(CROSS)ld -nostdlib -nostartfiles core_timer.o exceptions.o interrupts.o start.o thread_utils.o utils.o $(OBJS) -T kernel.ld -o $@
+kernel8.elf: core_timer.o exceptions.o interrupts.o start.o syscall.o thread_utils.o utils.o $(OBJS) kernel.ld
+	$(CROSS)ld -nostdlib -nostartfiles core_timer.o exceptions.o interrupts.o start.o syscall.o thread_utils.o utils.o $(OBJS) -T kernel.ld -o $@
 	$(CROSS)objdump -D kernel8.elf > kernel8.lst
-
-#kernel8.elf: exceptions.o start.o utils.o userprogram.o $(OBJS) kernel.ld
-#	$(CROSS)ld -nostdlib -nostartfiles exceptions.o start.o utils.o userprogram.o $(OBJS) -T kernel.ld -o $@
 
 runqemu: kernel8.img ramdisk
 	qemu-system-aarch64 -M raspi3 -kernel kernel8.img -dtb bcm2710-rpi-3-b-plus.dtb -initrd ramdisk -serial null -serial stdio

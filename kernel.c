@@ -1,3 +1,4 @@
+// TO DO: don't use directly uart, mailbox, memory allocator(s), thread
 #include "uart.h"
 #include "mbox.h"
 #include "cpio.h"
@@ -10,6 +11,7 @@
 #include "core_timer.h"
 #include "oneshot_timer.h"
 #include "printf.h"
+#include "kprintf.h"
 #include "allocator.h"
 #include "pool_allocator.h"
 #include "thread.h"
@@ -484,15 +486,8 @@ void test_allocator()
 	}
 }
 
+/*
 void foo(void *arg) {
-	/*
-	while (1) {
-		uint8_t id = current_thread_id();
-		printf("Thread (id: %x)\n", id);
-		delay(1000000);
-	}
-	*/
-	
 	for (int i = 0; i < 10; i++) {
 		uint8_t id = current_thread_id();
 		printf("Thread (id: %x) %x\n", id, i);
@@ -503,15 +498,36 @@ void foo(void *arg) {
 	uint8_t id = current_thread_id();
 	printf("Thread (id: %x) finished\n", id);
 }
+*/
+
+void user_thread(void *arg) {
+	printf("user thread started: id %x, EL %x\n",
+	       current_thread_id(), get_el());
+	while (1) ;  // TO DO: relpace later by exit();
+}
+
+void kernel_thread(void *arg) {
+	kprintf("kernel thread started: id %x, EL %x\n", 
+		current_thread_id(), get_el());
+	int err = thread_move_to_usermode(&user_thread);
+	if (err < 0) {
+		kprintf("error when move to usermode\n");
+	}
+	// while (1) ;
+	kprintf("kernel thread finished: id %x, EL %x\n", 
+		current_thread_id(), get_el());
+}
 
 
 void kmain(uint64_t dtb_ptr32)
 {
+	/*
 	int rst = 0;
-	char cmd[32];
+	char cmd[32]; 
+	*/
 
 	uart_init();
-	load_kernel();
+	// load_kernel();
 	
 	init_exception_table();
 
@@ -540,12 +556,18 @@ void kmain(uint64_t dtb_ptr32)
 
 	fdt_parse((const uint8_t *)dtb_ptr32, fdt_node_visit);
 
+	/*
 	for (int i = 0; i < 8; i++) {
 		printf("create thread %x\n", i);
 		thread_create(&foo, i);
 	}
+	*/
+	int res = thread_create(TF_KTHREAD, &kernel_thread, NULL, NULL);
+	if (res < 0) {
+		kprintf("could not create kernel thread\n");
+	}
 
-	idle();
+	thread_idle();
 
 	/*
 	while (1) {

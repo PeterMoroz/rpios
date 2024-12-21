@@ -1,9 +1,17 @@
+#include "kernel_context.inc"
+
 .global thread_trampoline
 thread_trampoline:
     bl schedule_tail
+    cbz x19, ret_to_user
     mov x0, x20
     blr x19
-    b thread_exit
+    // is it needed still ?
+    // b thread_exit
+ret_to_user:
+    bl disable_irq
+    kernel_exit 0
+
 
 .global cpu_switch_to
 cpu_switch_to:

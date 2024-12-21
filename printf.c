@@ -2,24 +2,42 @@
 
 #include <stdint.h>
 
-#include "uart.h"
+#include "syscall.h"
+#include "strutils.h"
+
+static void print_symbol(char s)
+{
+	uart_write(&s, 1);
+}
+
+static void print_string(const char *s)
+{
+	const size_t n = strlen(s);
+	uart_write(s, n);
+}
 
 static void print_uint32_hex(uint32_t x)
 {
-	for (int c = 28; c >= 0; c -= 4) {
+	char strbuff[8] = { '0' };
+	int i = 0;
+	for (int c = 28; c >= 0; c -= 4, i++) {
 		uint32_t n = (x >> c) & 0xF;
 		n += n > 9 ? 0x37 : 0x30;
-		uart_putc(n);
+		strbuff[i] = n & 0xFF;
 	}
+	uart_write(strbuff, sizeof(strbuff));
 }
 
 static void print_uint64_hex(uint64_t x)
 {
-	for (int c = 28; c >= 0; c -= 4) {
+	char strbuff[8] = { '0' };
+	int i = 0;
+	for (int c = 28; c >= 0; c -= 4, i++) {
 		uint64_t n = (x >> c) & 0xF;
 		n += n > 9 ? 0x37 : 0x30;
-		uart_putc(n);
+		strbuff[i] = n & 0xFF;
 	}
+	uart_write(strbuff, sizeof(strbuff));
 }
 
 void printf(const char *format, ...)
@@ -31,7 +49,7 @@ void printf(const char *format, ...)
 		if (*format == '%') {
 			switch (*(++format)) {
 				case '%':
-					uart_putc('%');
+					print_symbol('%');
 					break;
 				case 'x':
 					print_uint32_hex(va_arg(args, uint32_t));
@@ -40,11 +58,11 @@ void printf(const char *format, ...)
 					print_uint64_hex(va_arg(args, uint64_t));
 					break;
 				case 's':
-					uart_puts(va_arg(args, char *));
+					print_string(va_arg(args, char *));
 					break;
 			}
 		} else {
-			uart_putc(*format);
+			print_symbol(*format);
 		}
 	}
 	va_end(args);

@@ -730,16 +730,16 @@ The goals of this lab are:
 * Understand how to implement scheduler and context switch
 * Understand what is preemption
 
-*Thread* is a task which can be run on single core of CPU. The current state of thread is called *thread context*. Thread context is determined  by the values of CPU register's set.
-One of the main purpose of any OS is to ensure sharing CPU between several threads. By sharing of CPU I mean distribution the CPU's time by allocating time slots at each of them some thread is able to run on CPU. When thread run out alloted time slot OS save context of this thread, choose another thread to execute, load its context and run it. The save/load of context is called *context switching* and choosing the next thread to execute is called *scheduling*.
+*Thread* is a task which can be run on single core of CPU. One of the main purpose of any OS is to ensure sharing CPU between several threads. By sharing of CPU I mean distribution the CPU's time by allocating time slots at each of them some thread is able to run on CPU. When thread run out alloted time slot OS save context (a set of CPU registers) of this thread, choose another thread to execute, load its context and run it. *Thread context* is processor state (a set of CPU registers) related to this thread. The save/load of context is called *context switching* and choosing the next thread to execute is called *preemption*. The sharing of CPU time between different threads is called *scheduling*.
 
-When  speaking about thread from programming point ow view, it is a function which defines execution flow of thread. To manage threads os  need some kind of list of data structures which associated with these threads and keep the current state of thread. Therefore when creating a new thread it is needed:
+
+When  speaking about thread from programming point of view, it is a function which defines execution flow of thread. To manage threads os  need some kind of list of data structures which associated with these threads and keep the current state of thread. Therefore when creating a new thread it is needed:
 * allocate and initialize thread's context structure
 * assign a function which will be executed by this thread
-* allocate a stack space for thread function
+* allocate a stack frame for thread function
 * put thread's context structure into OS' list for managing
 
-
+The scheduling algorithm is based on counting of the time each thread spend when running. When a new thread is created it is assigned some amount of virtual time in accordance with its priority (higher priority, more time units thread gets). In our simple OS only one thread can be executed on CPU at some period of time of time (multicore is not used for simplicity). The number of time units allocated to thread is decremented with each time tick and as it becomes equal to zero the scheduling algorithm choose another thread to execute.
 
 ##### references
 [Scheduler](https://github.com/s-matyukevich/raspberry-pi-os/blob/master/docs/lesson04/rpi-os.md)
