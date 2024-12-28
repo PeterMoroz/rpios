@@ -468,21 +468,21 @@ The figure below shows the layout of the blob of data containing the device tree
             0x20 |-------------------|
                  | size dt strings   |
             0x24 |-------------------|
-                       ......
-                       ......
+                       ......         
+                       ......         
   off mem rsvmap |-------------------|
                  |      memory       |
                  | reservation block |
                  |-------------------|
-                       ......
-                       ......
+                       ......         
+                       ......         
    off dt struct |-------------------|
                  |                   |
                  |  structure block  |
                  |                   |
                  |-------------------|
-                       ......
-                       ......
+                       ......         
+                       ......         
   off dt strings |-------------------|
                  |                   |
                  |   strings block   |
@@ -494,7 +494,7 @@ The structure block contains the device tree nodes. Each node is introduced with
 Each property, after the DT_PROP tag, has a 32-bit value giving an offset from the beginning of the strings block at which the property name is stored. The name offset is followed by the length of the property value (as a 32-bit value) and then the data itself padded to a 32-bit boundary.
 
 ##### references
-[Linux Serial Ports Using C/C++](https://blog.mbedded.ninja/programming/operating-systems/linux/linux-serial-ports-using-c-cpp/
+[Linux Serial Ports Using C/C++](https://blog.mbedded.ninja/programming/operating-systems/linux/linux-serial-ports-using-c-cpp/)
 [Booting your own kernel on RPi via UART](https://blog.nicolasmesa.co/posts/2019/08/booting-your-own-kernel-on-raspberry-pi-via-uart/)
 [XModem protocol with CRC](http://ee6115.mit.edu/amulet/xmodem.htm)
 [initramfs buffer format](https://docs.kernel.org/driver-api/early-userspace/buffer-format.html)
@@ -717,6 +717,6 @@ The interrupts in RPI are level-based, it means that interrupt request will rema
 
 
 ##### references
-[AArch64 Exception Levels](https://krinkinmu.github.io/2021/01/04/aarch64-exception-levels.html
+[AArch64 Exception Levels](https://krinkinmu.github.io/2021/01/04/aarch64-exception-levels.html)
 [Interrupts](https://s-matyukevich.github.io/raspberry-pi-os/docs/lesson03/rpi-os.html)
 [AArch64-Reference-Manual](https://developer.arm.com/documentation/ddi0487/ca/)
